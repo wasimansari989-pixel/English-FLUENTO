@@ -9,8 +9,9 @@ import {
   Easing,
   Platform,
   Image,
+  BackHandler,
 } from 'react-native';
-import { useRouter, useFocusEffect, Redirect } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProgressRepository, UserProgress } from '../src/database/progressRepository';
@@ -44,12 +45,20 @@ export default function HomeScreen() {
   // Subtle pulsing ambient animations for interactive elements
   const livePulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Hardware back on Home exits the app cleanly, avoiding unwanted back-navigation
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [])
+  );
+
   const loadData = async () => {
     try {
-      if (!SessionManager.isEntered()) {
-        return;
-      }
-
       const isCompleted = await UserProfileRepository.isOnboardingCompleted();
       if (!isCompleted) {
         router.replace('/onboarding');
@@ -125,11 +134,6 @@ export default function HomeScreen() {
   const goalTargetMinutes = profile.dailyGoalMinutes || 10;
   const goalPercent = Math.min(100, Math.round((estimatedActiveMinutes / goalTargetMinutes) * 100));
 
-  // If session is not entered yet (fresh install or reload), immediately redirect to Welcome
-  // without rendering even a single pixel of the Home screen
-  if (!SessionManager.isEntered()) {
-    return <Redirect href="/onboarding" />;
-  }
 
   return (
     <View style={styles.rootContainer}>

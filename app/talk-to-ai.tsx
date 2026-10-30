@@ -14,6 +14,7 @@ import {
   Alert,
   ActivityIndicator,
   Vibration,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -469,6 +470,8 @@ export default function TalkToAIScreen() {
     }
   }, [noticeModal.visible]);
 
+
+
   // Initialize client
   useEffect(() => {
     const client = new GeminiLiveClient({
@@ -917,6 +920,53 @@ export default function TalkToAIScreen() {
     }
   };
 
+  // Hardware back press handler on Android
+  useEffect(() => {
+    const onBackPress = () => {
+      if (noticeModal.visible) {
+        setNoticeModal((prev) => ({ ...prev, visible: false }));
+        return true;
+      }
+
+      if (isInSession) {
+        setNoticeModal({
+          visible: true,
+          type: 'confirm_exit',
+          badge: '⚠️ ACTIVE VOICE CALL',
+          title: 'End Practice Session?',
+          message: 'Kya aap conversation band karke bahar jana chahte hain?',
+          hindiDetail: 'Session band hone par AI Voice connection disconnect ho jayega.',
+          primaryActionText: 'End & Leave 🚪',
+          onPrimaryAction: async () => {
+            setNoticeModal((prev) => ({ ...prev, visible: false }));
+            await handleEndSession();
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          },
+          secondaryActionText: 'Stay & Practice 🎙️',
+          onSecondaryAction: () => {
+            setNoticeModal((prev) => ({ ...prev, visible: false }));
+          },
+        });
+        return true;
+      }
+
+      SpeechService.stop();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [noticeModal.visible, isInSession, handleEndSession, router]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
@@ -938,7 +988,11 @@ export default function TalkToAIScreen() {
                 onPrimaryAction: async () => {
                   setNoticeModal((prev) => ({ ...prev, visible: false }));
                   await handleEndSession();
-                  router.back();
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/');
+                  }
                 },
                 secondaryActionText: 'Stay & Practice 🎙️',
                 onSecondaryAction: () => {
@@ -947,7 +1001,11 @@ export default function TalkToAIScreen() {
               });
             } else {
               SpeechService.stop();
-              router.back();
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
             }
           }}
           accessibilityLabel="Back"

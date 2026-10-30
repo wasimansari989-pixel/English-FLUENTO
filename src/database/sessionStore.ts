@@ -1,5 +1,5 @@
-// In-memory session state (resets to false on every app reload or restart)
-let sessionEntered = false;
+// Session state tracking - initialized to true so returning users are not kicked to onboarding
+let sessionEntered = true;
 
 export const SessionManager = {
   isEntered(): boolean {

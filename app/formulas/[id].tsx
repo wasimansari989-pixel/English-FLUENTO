@@ -75,7 +75,16 @@ export default function FormulaDetailScreen() {
           <Ionicons name="alert-circle-outline" size={36} color={colors.secondaryText} />
         </View>
         <Text style={styles.notFoundText}>Formula #{formulaId} not found</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/formulas');
+            }
+          }}
+        >
           <Text style={styles.backBtnText}>Return to Formulas</Text>
         </TouchableOpacity>
       </View>

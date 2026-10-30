@@ -28,7 +28,7 @@ const AppLightTheme = {
 };
 
 export const unstable_settings = {
-  initialRouteName: 'onboarding',
+  initialRouteName: 'index',
 };
 
 export default function RootLayout() {
@@ -115,7 +115,7 @@ export default function RootLayout() {
           name="formulas/[id]"
           options={{
             title: 'Formula Study',
-            headerBackTitle: 'Back',
+            headerLeft: renderFastBackButton,
           }}
         />
         <Stack.Screen

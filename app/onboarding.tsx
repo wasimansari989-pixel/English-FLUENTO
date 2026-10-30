@@ -481,11 +481,16 @@ export default function OnboardingScreen() {
         handleBack();
         return true;
       }
-      return false;
+      if (router.canGoBack()) {
+        router.back();
+        return true;
+      }
+      BackHandler.exitApp();
+      return true;
     };
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
-  }, [currentStep, handleBack]);
+  }, [currentStep, handleBack, router]);
 
   // Save profile and finish
   const finishOnboarding = async (targetRoute: '/' | '/formulas' = '/') => {
@@ -679,7 +684,15 @@ export default function OnboardingScreen() {
           <FluentButton
             title="I already have an account"
             variant="light"
-            onPress={() => transitionTo('account')}
+            onPress={async () => {
+              const isCompleted = await UserProfileRepository.isOnboardingCompleted();
+              if (isCompleted) {
+                SessionManager.setEntered(true);
+                router.replace('/');
+              } else {
+                transitionTo('account');
+              }
+            }}
           />
         </View>
         <Text style={styles.footerNote}>Personalise your learning in a few quick steps.</Text>
