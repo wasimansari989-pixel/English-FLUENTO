@@ -1,0 +1,34 @@
+{
+  "groq": {
+    "providerName": "groq",
+    "configuredModel": "openai/gpt-oss-120b",
+    "dailyRequestLimit": 14400,
+    "requestCount": 0,
+    "successCount": 0,
+    "failureCount": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "knownRemainingQuota": null,
+    "circuitState": "CLOSED",
+    "cooldownUntil": null,
+    "lastErrorCategory": null,
+    "lastErrorTime": null,
+    "lastResetDate": "2026-10-25"
+  },
+  "gemini": {
+    "providerName": "gemini",
+    "configuredModel": "gemini-3.8-flash",
+    "dailyRequestLimit": 1500,
+    "requestCount": 0,
+    "successCount": 0,
+    "failureCount": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "knownRemainingQuota": null,
+    "circuitState": "CLOSED",
+    "cooldownUntil": null,
+    "lastErrorCategory": null,
+    "lastErrorTime": null,
+    "lastResetDate": "2026-10-25"
+  }
+}

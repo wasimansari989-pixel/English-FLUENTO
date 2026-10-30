@@ -1,0 +1,15 @@
+{
+  "name": "english-formula-backend",
+  "version": "1.0.0",
+  "description": "Secure AI backend service for English Formula App",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

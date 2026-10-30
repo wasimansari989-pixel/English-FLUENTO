@@ -1,0 +1,1219 @@
+[
+  {
+    "word": "अंदर",
+    "count": 12,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "अन्दर",
+    "count": 2,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "अभियंता",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "आखिरकार",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "आदत",
+    "count": 37,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "आदमी",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "आपत्ति",
+    "count": 12,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "आितों",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "इंग्लिश",
+    "count": 9,
+    "issues": [
+      "broken_gla",
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "इंजीनियर",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "इंडिया",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "इसीदलए",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "ईष्याज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "उठूाँगा",
+    "count": 1,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "उत्सादहत",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "उपलग्लियों",
+    "count": 1,
+    "issues": [
+      "broken_gla",
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "कदव",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "करुाँगा",
+    "count": 1,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "कादबल",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "कितना",
+    "count": 12,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किताब",
+    "count": 7,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किताबे",
+    "count": 10,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किताबें",
+    "count": 4,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किताबों",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किया",
+    "count": 15,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किये",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किस",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसका",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसकी",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसने",
+    "count": 12,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किससे",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसान",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसी",
+    "count": 12,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किसे",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "किस्मत",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "कुत्ों",
+    "count": 2,
+    "issues": [
+      "halant_matra"
+    ]
+  },
+  {
+    "word": "कॉलेज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "कोदशश",
+    "count": 15,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "खरीदना",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "खरीदने",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "खिलाड़ी",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "गदणत",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "गलदतयाँ",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "गलदतयो",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "गलदतयों",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "चिंतित",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्ला",
+    "count": 5,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्लाएाँ",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्लाओ",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्लाते",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्लाना",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चिल्लाने",
+    "count": 4,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "चौदबसों",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "जन्मदिन",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "जादहर",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "जिंदगी",
+    "count": 2,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "जिद्दी",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "जिम्मेदार",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "जीतूाँगा",
+    "count": 1,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "जोखिम",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "टरादफक",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "डॉक्टसज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "दक",
+    "count": 124,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दचढ़ाने",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दजतना",
+    "count": 12,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दडनर",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकट",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकलने",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकला",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकली",
+    "count": 2,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकले",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकालो",
+    "count": 2,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनकालों",
+    "count": 10,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनयमो",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दनराश",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दपज्जा",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दपता",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दपयूाँगा",
+    "count": 1,
+    "issues": [
+      "double_matra",
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दफल्मों",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दबजली",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दबल्कुल",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दमठाई",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दमनट",
+    "count": 5,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दलए",
+    "count": 78,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दलया",
+    "count": 10,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवचार",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवचारों",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवद्याथी",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवनम्र",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवराट",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दवश्वास",
+    "count": 13,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दसखाओ",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दसखाना",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दसखाने",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दसफज",
+    "count": 6,
+    "issues": [
+      "suspicious_da",
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "दसलाई",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दहम्मत",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दहसाब",
+    "count": 12,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "दिन",
+    "count": 46,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिनचर्या",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिमाग",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिया",
+    "count": 38,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिल",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिलचस्पी",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिला",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "दिल्ली",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "नाराज",
+    "count": 9,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "निश्चित",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "पदत",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "पररदचत",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "पूणज",
+    "count": 6,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "पेंदसल",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "पोदलश",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "पोदलस",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "प्रदतभा",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "प्रदतयोदगता",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "प्रश्ों",
+    "count": 1,
+    "issues": [
+      "halant_matra"
+    ]
+  },
+  {
+    "word": "फकज",
+    "count": 6,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "फिर",
+    "count": 9,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "फिलहाल",
+    "count": 12,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "फिल्म",
+    "count": 21,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "बदल",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "बदलेगा",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "बनूाँ",
+    "count": 1,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "बिना",
+    "count": 16,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "बुद्धिमानी",
+    "count": 5,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "भदवष्य",
+    "count": 7,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "मदद",
+    "count": 19,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "मददगार",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "मादहर",
+    "count": 18,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "मारूाँ",
+    "count": 6,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "मिल",
+    "count": 15,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलता",
+    "count": 2,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलते",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलनसार",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलना",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलने",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिला",
+    "count": 13,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलाकर",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलूँगा",
+    "count": 4,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिले",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलेंगे",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलो",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मिलोगे",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "मुखज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "मुश्किल",
+    "count": 20,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "यदि",
+    "count": 5,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "ररवाज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "रिपोर्ट",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "रीदत",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "लंदन",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "लक्ष्ों",
+    "count": 1,
+    "issues": [
+      "halant_matra"
+    ]
+  },
+  {
+    "word": "लड़कियाँ",
+    "count": 5,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "लिखूाँ",
+    "count": 2,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "लेदकन",
+    "count": 6,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "व्यग्लक्तत्व",
+    "count": 1,
+    "issues": [
+      "broken_gla"
+    ]
+  },
+  {
+    "word": "शक्ति",
+    "count": 6,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "शदमजला",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "शामिल",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "संपत्ति",
+    "count": 1,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "सकूाँ",
+    "count": 4,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "साइकिल",
+    "count": 3,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "सादबत",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "सिरदर्द",
+    "count": 1,
+    "issues": [
+      "suspicious_da",
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "सुंदर",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "सुन्दर",
+    "count": 1,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "सुरक्षित",
+    "count": 7,
+    "issues": [
+      "suspicious_internal_i"
+    ]
+  },
+  {
+    "word": "सूरज",
+    "count": 1,
+    "issues": [
+      "suspicious_j_end"
+    ]
+  },
+  {
+    "word": "हआ",
+    "count": 30,
+    "issues": [
+      "known_glitch"
+    ]
+  },
+  {
+    "word": "हऐ",
+    "count": 6,
+    "issues": [
+      "known_glitch"
+    ]
+  },
+  {
+    "word": "हसूाँ",
+    "count": 1,
+    "issues": [
+      "double_matra"
+    ]
+  },
+  {
+    "word": "होदशयार",
+    "count": 3,
+    "issues": [
+      "suspicious_da"
+    ]
+  },
+  {
+    "word": "िूसरों",
+    "count": 1,
+    "issues": [
+      "double_matra",
+      "starts_with_matra"
+    ]
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "id": "cat-1",
+    "name": "Am / Is / Are",
+    "count": 207
+  },
+  {
+    "id": "cat-2",
+    "name": "Can / Could",
+    "count": 17
+  },
+  {
+    "id": "cat-3",
+    "name": "Common Expressions",
+    "count": 178
+  },
+  {
+    "id": "cat-4",
+    "name": "Conditional Sentences",
+    "count": 31
+  },
+  {
+    "id": "cat-5",
+    "name": "Daily Spoken English",
+    "count": 34
+  },
+  {
+    "id": "cat-6",
+    "name": "Do / Does / Did",
+    "count": 27
+  },
+  {
+    "id": "cat-7",
+    "name": "Have / Has / Had",
+    "count": 60
+  },
+  {
+    "id": "cat-8",
+    "name": "Have been / Has been / Had been",
+    "count": 7
+  },
+  {
+    "id": "cat-9",
+    "name": "May / Might",
+    "count": 6
+  },
+  {
+    "id": "cat-10",
+    "name": "Negative Sentences",
+    "count": 64
+  },
+  {
+    "id": "cat-11",
+    "name": "Questions and Interrogative",
+    "count": 147
+  },
+  {
+    "id": "cat-12",
+    "name": "Should / Must",
+    "count": 19
+  },
+  {
+    "id": "cat-13",
+    "name": "Was / Were",
+    "count": 18
+  },
+  {
+    "id": "cat-14",
+    "name": "Will / Would",
+    "count": 51
+  },
+  {
+    "id": "cat-15",
+    "name": "Wishes and Regrets",
+    "count": 7
+  }
+]
