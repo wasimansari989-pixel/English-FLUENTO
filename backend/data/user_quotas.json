@@ -1,27 +1,27 @@
 {
   "date": "2026-10-30",
-  "globalSuccessfulAnswers": 8,
+  "globalSuccessfulAnswers": 0,
   "users": {
-    "::ffff:192.168.29.50": {
-      "successfulAnswers": 0,
+    "rollover_user": {
+      "successfulAnswers": 1,
       "reserved": 0,
       "lastRequestTimestamp": 0,
-      "minuteWindowStart": 1793367246529,
+      "minuteWindowStart": 1793384488682,
+      "minuteRequestCount": 0
+    },
+    "::1": {
+      "successfulAnswers": 12,
+      "reserved": 0,
+      "lastRequestTimestamp": 0,
+      "minuteWindowStart": 1793384560898,
       "minuteRequestCount": 0
     },
     "user_iu1t513k_mvtaavhk": {
-      "successfulAnswers": 6,
+      "successfulAnswers": 13,
       "reserved": 0,
-      "lastRequestTimestamp": 1793370413526,
-      "minuteWindowStart": 1793370357151,
-      "minuteRequestCount": 6
-    },
-    "::1": {
-      "successfulAnswers": 2,
-      "reserved": 0,
-      "lastRequestTimestamp": 1793377871999,
-      "minuteWindowStart": 1793377865456,
-      "minuteRequestCount": 2
+      "lastRequestTimestamp": 0,
+      "minuteWindowStart": 1793386018895,
+      "minuteRequestCount": 0
     }
   }
 }
