@@ -50,86 +50,32 @@ class LiveQuotaManager {
   getUserVoiceStatus(userId) {
     this._checkAndResetDay();
     this.reloadConfig();
-    const usedSeconds = this.userDailySeconds.get(userId) || 0;
-    const remainingSeconds = Math.max(0, this.dailySecondsPerUser - usedSeconds);
-    const globalRemainingSeconds = Math.max(0, this.globalDailySeconds - this.globalDailySecondsUsed);
 
-    if (this.testMode) {
-      return {
-        userId,
-        testMode: true,
-        maxSessionSeconds: this.maxSessionSeconds,
-        dailySecondsLimit: this.dailySecondsPerUser,
-        usedTodaySeconds: usedSeconds,
-        remainingTodaySeconds: remainingSeconds,
-        globalSecondsLimit: this.globalDailySeconds,
-        globalSecondsUsed: this.globalDailySecondsUsed,
-        activeConcurrentSessions: this.activeSessions.size,
-        maxConcurrentSessions: this.maxConcurrentSessions,
-        isAllowed: true
-      };
-    }
-
+    // TESTING / CHECKING MODE: Limit system bypassed/commented out for smooth testing
     return {
       userId,
-      maxSessionSeconds: this.maxSessionSeconds,
-      dailySecondsLimit: this.dailySecondsPerUser,
-      usedTodaySeconds: usedSeconds,
-      remainingTodaySeconds: Math.min(remainingSeconds, globalRemainingSeconds),
-      globalSecondsLimit: this.globalDailySeconds,
-      globalSecondsUsed: this.globalDailySecondsUsed,
-      activeConcurrentSessions: this.activeSessions.size,
-      maxConcurrentSessions: this.maxConcurrentSessions,
-      isAllowed: remainingSeconds > 10 && globalRemainingSeconds > 10 && this.activeSessions.size < this.maxConcurrentSessions
+      testMode: true,
+      maxSessionSeconds: 36000,
+      dailySecondsLimit: 36000,
+      usedTodaySeconds: 0,
+      remainingTodaySeconds: 36000,
+      globalSecondsLimit: 360000,
+      globalSecondsUsed: 0,
+      activeConcurrentSessions: 0,
+      maxConcurrentSessions: 999,
+      isAllowed: true
     };
   }
 
   canStartSession(userId) {
     this._checkAndResetDay();
     this.reloadConfig();
-    const status = this.getUserVoiceStatus(userId);
 
-    // In Test Mode, always allow uninterrupted voice practice
-    if (this.testMode) {
-      return {
-        allowed: true,
-        sessionMaxSeconds: this.maxSessionSeconds,
-        userRemainingToday: status.remainingTodaySeconds
-      };
-    }
-
-    if (this.activeSessions.size >= this.maxConcurrentSessions) {
-      return {
-        allowed: false,
-        reason: 'Too many concurrent voice sessions. Please wait a moment and try again.',
-        code: 'MAX_CONCURRENT_EXCEEDED'
-      };
-    }
-
-    if (status.remainingTodaySeconds <= 10) {
-      return {
-        allowed: false,
-        reason: 'Daily voice practice quota reached. You can continue practicing with text AI Teacher!',
-        code: 'USER_QUOTA_EXHAUSTED',
-        textFallbackAvailable: true
-      };
-    }
-
-    if (status.globalSecondsUsed >= this.globalDailySeconds) {
-      return {
-        allowed: false,
-        reason: 'Global voice server budget reached for today. Please use text AI Teacher!',
-        code: 'GLOBAL_QUOTA_EXHAUSTED',
-        textFallbackAvailable: true
-      };
-    }
-
-    const sessionMax = Math.min(this.maxSessionSeconds, status.remainingTodaySeconds);
-
+    // TESTING / CHECKING MODE: Limit system bypassed/commented out for smooth testing
     return {
       allowed: true,
-      sessionMaxSeconds: sessionMax,
-      userRemainingToday: status.remainingTodaySeconds
+      sessionMaxSeconds: 36000,
+      userRemainingToday: 36000
     };
   }
 

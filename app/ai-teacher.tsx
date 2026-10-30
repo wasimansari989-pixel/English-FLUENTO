@@ -335,7 +335,9 @@ export default function AITeacherScreen() {
         <View style={styles.quotaBar}>
           <View style={styles.quotaDot} />
           <Text style={styles.quotaText}>
-            {quotaRemaining} of 10 free AI answers remaining today
+            {quotaRemaining >= 100
+              ? '✨ Unlimited Free AI Answers (Testing Mode)'
+              : `${quotaRemaining} of 10 free AI answers remaining today`}
           </Text>
           {fallbackActive && (
             <View style={{ marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#38BDF820' }}>

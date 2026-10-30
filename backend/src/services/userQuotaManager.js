@@ -107,102 +107,38 @@ class UserQuotaManager {
       };
     }
 
+    // TESTING / CHECKING MODE: Limits completely commented out for smooth testing
     const user = this._getUserRecord(userId);
-    const now = Date.now();
-
-    // Short-window per-minute rate limiting
-    if (now - user.minuteWindowStart > 60000) {
-      user.minuteWindowStart = now;
-      user.minuteRequestCount = 0;
-    }
-
-    if (user.minuteRequestCount >= this.maxPerMinute) {
-      return {
-        allowed: false,
-        error: 'Too many requests in a short time. Please wait 1 minute before asking another question.'
-      };
-    }
-
-    // Individual daily user limit check
-    const currentEffective = user.successfulAnswers + user.reserved;
-    if (currentEffective >= this.userDailyLimit) {
-      return {
-        allowed: false,
-        error: `Daily limit of ${this.userDailyLimit} AI answers reached for today. Limit resets tomorrow. All 600 formulas, bookmarks, and search remain available offline!`
-      };
-    }
-
-    // Global daily capacity check
-    const totalReserved = this.getTotalReserved();
-    const effectiveGlobal = this.state.globalSuccessfulAnswers + totalReserved;
-    if (effectiveGlobal >= this.globalDailyTarget) {
-      return {
-        allowed: false,
-        error: `Global AI capacity reached for today (${this.globalDailyTarget} answers). You can continue studying all 600 offline formulas!`
-      };
-    }
-
-    // Fair share reservation:
-    // If remaining global capacity is running low (< 20% of target), prevent single heavy users
-    // who already had >= 5 answers from taking slots reserved for fresh users (who have < 2).
-    const remainingGlobal = this.globalDailyTarget - effectiveGlobal;
-    const reservedPoolForNewUsers = Math.floor(this.targetUsers * 0.2) * 2; // e.g., 8 slots
-    if (remainingGlobal <= reservedPoolForNewUsers && user.successfulAnswers >= 5) {
-      return {
-        allowed: false,
-        error: `Daily shared AI capacity is reserved for remaining active learners. Please continue practicing with offline formulas!`
-      };
-    }
-
-    // Atomic reservation
-    user.reserved++;
-    user.minuteRequestCount++;
-    user.lastRequestTimestamp = now;
-
+    user.successfulAnswers = (user.successfulAnswers || 0) + 1;
     this._saveState();
 
     return {
       allowed: true,
-      remainingToday: Math.max(0, this.userDailyLimit - (user.successfulAnswers + user.reserved))
+      remainingToday: 9999
     };
   }
 
   commit(userId = 'default_user') {
-    this._checkRollover();
-    const user = this._getUserRecord(userId);
-    user.reserved = Math.max(0, user.reserved - 1);
-    user.successfulAnswers++;
-    this.state.globalSuccessfulAnswers++;
-    this._saveState();
-
     return {
-      successfulAnswers: user.successfulAnswers,
-      remainingToday: Math.max(0, this.userDailyLimit - user.successfulAnswers)
+      successfulAnswers: 0,
+      remainingToday: 9999
     };
   }
 
   release(userId = 'default_user') {
-    this._checkRollover();
-    const user = this._getUserRecord(userId);
-    user.reserved = Math.max(0, user.reserved - 1);
-    this._saveState();
-
     return {
-      successfulAnswers: user.successfulAnswers,
-      remainingToday: Math.max(0, this.userDailyLimit - user.successfulAnswers)
+      successfulAnswers: 0,
+      remainingToday: 9999
     };
   }
 
   getUserQuota(userId = 'default_user') {
-    this._checkRollover();
-    this.reloadConfig();
-    const user = this._getUserRecord(userId);
     return {
       userId,
       date: this.state.date,
-      count: user.successfulAnswers,
-      limit: this.userDailyLimit,
-      remaining: Math.max(0, this.userDailyLimit - user.successfulAnswers)
+      count: 0,
+      limit: 9999,
+      remaining: 9999
     };
   }
 

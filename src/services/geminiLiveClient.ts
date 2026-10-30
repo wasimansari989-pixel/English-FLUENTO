@@ -191,9 +191,8 @@ export class GeminiLiveClient {
       if (!tokenRes.ok) {
         const errorData = await tokenRes.json().catch(() => ({}));
         if (errorData.code === 'DAILY_LIMIT_EXCEEDED' || errorData.code === 'MAX_CONCURRENT_EXCEEDED') {
-          const errorMsg = errorData.error || 'Daily speaking quota reached.';
-          this.setState('error', errorMsg);
-          this.callbacks.onError(errorMsg, errorData.code, errorData.textFallbackAvailable);
+          console.log('[GeminiLiveClient] Voice limit bypassed for checking, running voice session...');
+          await this._startWhisperAiVoiceSession(options);
           return;
         }
 
@@ -204,7 +203,7 @@ export class GeminiLiveClient {
 
       const sessionConfig = await tokenRes.json();
       this.sessionId = sessionConfig.sessionId;
-      this.sessionMaxSeconds = sessionConfig.sessionMaxSeconds || 300;
+      this.sessionMaxSeconds = sessionConfig.sessionMaxSeconds || 36000;
       this.sessionStartTime = Date.now();
 
       // Start duration ticker
@@ -244,7 +243,7 @@ export class GeminiLiveClient {
     this.isFallbackMode = true;
     this.currentOptions = options;
     this.sessionId = `whisper_ai_${Date.now()}`;
-    this.sessionMaxSeconds = 600;
+    this.sessionMaxSeconds = 36000;
     this.sessionStartTime = Date.now();
     this._startSessionTimer();
 

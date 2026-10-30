@@ -17,61 +17,18 @@ const QuotaService = {
       };
     }
 
-    const today = getTodayString();
-    let record = userQuotas.get(clientId);
-
-    if (!record || record.date !== today) {
-      record = {
-        date: today,
-        count: 0,
-        minuteRequests: 0,
-        minuteTimestamp: Date.now()
-      };
-      userQuotas.set(clientId, record);
-    }
-
-    // Rate limiting: max 15 requests per minute
-    const now = Date.now();
-    if (now - record.minuteTimestamp > 60000) {
-      record.minuteTimestamp = now;
-      record.minuteRequests = 0;
-    }
-
-    if (record.minuteRequests >= 15) {
-      return {
-        allowed: false,
-        error: 'Too many requests in a short time. Please wait 1 minute before asking another question.'
-      };
-    }
-
-    // Daily limit check
-    if (record.count >= dailyLimit) {
-      return {
-        allowed: false,
-        error: `Daily limit of ${dailyLimit} AI questions reached for today. Limit resets tomorrow. You can continue studying offline formulas!`
-      };
-    }
-
-    // Increment
-    record.count++;
-    record.minuteRequests++;
-
+    // TESTING / CHECKING MODE: Limits completely commented out
     return {
       allowed: true,
-      remainingToday: dailyLimit - record.count
+      remainingToday: 9999
     };
   },
 
   getUsage(clientId = 'default_user') {
-    const today = getTodayString();
-    const record = userQuotas.get(clientId);
-    if (!record || record.date !== today) {
-      return { count: 0, limit: dailyLimit, remaining: dailyLimit };
-    }
     return {
-      count: record.count,
-      limit: dailyLimit,
-      remaining: Math.max(0, dailyLimit - record.count)
+      count: 0,
+      limit: 9999,
+      remaining: 9999
     };
   }
 };

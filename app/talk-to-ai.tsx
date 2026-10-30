@@ -135,8 +135,8 @@ export default function TalkToAIScreen() {
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [continuousMode, setContinuousMode] = useState<boolean>(true);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(600);
-  const [totalDailySeconds, setTotalDailySeconds] = useState<number>(600);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(36000);
+  const [totalDailySeconds, setTotalDailySeconds] = useState<number>(36000);
   const [usedTodaySeconds, setUsedTodaySeconds] = useState<number>(0);
   const [showTranscripts, setShowTranscripts] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'conversation' | 'pronunciation'>('conversation');
@@ -644,6 +644,7 @@ export default function TalkToAIScreen() {
   };
 
   const formatFriendlyDuration = (secs: number) => {
+    if (secs >= 3600) return 'Unlimited';
     if (secs <= 0) return '0s';
     if (secs < 60) return `${secs}s`;
     const m = Math.floor(secs / 60);
