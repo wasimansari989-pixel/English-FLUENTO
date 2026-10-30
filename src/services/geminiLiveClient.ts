@@ -172,49 +172,11 @@ export class GeminiLiveClient {
     this.currentOptions = options;
 
     try {
-      const backendUrl = await getBackendUrl();
-      const clientId = await getClientId();
-
-      // 3. Request ephemeral token and session configuration from backend
-      const tokenRes = await fetch(`${backendUrl}/api/ai/live/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: options.mode,
-          topic: options.topic,
-          formulaId: options.formulaId || undefined,
-          clientId,
-        }),
-        signal: AbortSignal.timeout(2000),
-      });
-
-      if (!tokenRes.ok) {
-        const errorData = await tokenRes.json().catch(() => ({}));
-        if (errorData.code === 'DAILY_LIMIT_EXCEEDED' || errorData.code === 'MAX_CONCURRENT_EXCEEDED') {
-          console.log('[GeminiLiveClient] Voice limit bypassed for checking, running voice session...');
-          await this._startWhisperAiVoiceSession(options);
-          return;
-        }
-
-        console.log('[GeminiLiveClient] Live token unavailable, activating Whisper + AI Voice fallback...');
-        await this._startWhisperAiVoiceSession(options);
-        return;
-      }
-
-      const sessionConfig = await tokenRes.json();
-      this.sessionId = sessionConfig.sessionId;
-      this.sessionMaxSeconds = sessionConfig.sessionMaxSeconds || 36000;
-      this.sessionStartTime = Date.now();
-
-      // Start duration ticker
-      this._startSessionTimer();
-
-      // 4. Establish Live WebSocket connection with ephemeral token
-      this.setState('connecting', 'Connecting to Gemini Live...');
-      this._connectWebSocket(sessionConfig);
-    } catch (err: any) {
-      console.warn('[GeminiLiveClient] Live server unavailable, activating Whisper + AI Voice fallback:', err.message);
+      // Connect directly to the high-speed Whisper + Fluent AI + Studio Neural Voice engine
       await this._startWhisperAiVoiceSession(options);
+    } catch (err: any) {
+      console.warn('[GeminiLiveClient] Voice session start error:', err);
+      this.setState('ready', 'Tap living orb to start conversation');
     }
   }
 
@@ -858,87 +820,65 @@ export class GeminiLiveClient {
       // 3. Immediately display user turn in UI
       this._updateUserTurn(transcribedText, false);
 
-      // 4. If in fallback mode or WebSocket is not open, process with AI Teacher & Native TTS
-      if (this.isFallbackMode || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        this.setState('processing', 'AI Teacher is thinking...');
+      // 4. Ultra-fast conversational teaching turn via Fluent AI backend
+      this.setState('processing', 'AI Teacher is thinking...');
 
-        const evalMode = this.currentOptions?.mode === 'conversation' ? 'advanced' : (this.currentOptions?.mode || 'beginner');
-        const historyPayload = this.turns.slice(-6).map((t) => ({
-          sender: t.role === 'user' ? 'user' : 'ai',
-          text: t.text,
-        }));
+      const historyPayload = this.turns.slice(-6).map((t) => ({
+        sender: t.role === 'user' ? 'user' : 'ai',
+        text: t.text,
+      }));
 
-        // Ultra-fast conversational teaching turn (Groq Qwen/GPT-OSS ~250ms)
-        const convRes = await AIClient.conversationStep(
-          transcribedText,
-          this.currentOptions?.topic || 'daily_life',
-          historyPayload
-        ).catch((e) => {
-          console.warn('[GeminiLiveClient] Conversation step error:', e);
-          return {
-            reply: "That is great! Tell me more about that in English.",
-            correctionHindi: null,
-            correctedEnglish: null,
-            remainingToday: 10,
-          };
-        });
-
-        let correctionData: CorrectionData | null = null;
-        if (convRes.correctedEnglish && convRes.correctedEnglish.trim().toLowerCase() !== transcribedText.trim().toLowerCase()) {
-          correctionData = {
-            original: transcribedText,
-            corrected: convRes.correctedEnglish,
-            explanation: convRes.correctionHindi || 'Grammar improvement',
-            formulaId: null,
-          };
-        }
-
-        const aiReplyText = convRes.reply;
-        const newTurn: TurnMessage = {
-          id: `turn_m_${Date.now()}`,
-          role: 'model',
-          text: aiReplyText,
-          timestamp: Date.now(),
-          correction: correctionData,
-          isStreaming: false,
+      // High-speed conversational teaching turn (Groq Qwen/GPT-OSS ~300ms)
+      const convRes = await AIClient.conversationStep(
+        transcribedText,
+        this.currentOptions?.topic || 'daily_life',
+        historyPayload
+      ).catch((e) => {
+        console.warn('[GeminiLiveClient] Conversation step error:', e);
+        return {
+          reply: "I am listening! Please keep speaking in English, and ask in Hindi if you need any help.",
+          correctionHindi: null,
+          correctedEnglish: null,
+          remainingToday: 9999,
         };
+      });
 
-        this.turns.push(newTurn);
-        this.callbacks.onTurnUpdate([...this.turns]);
-
-        // Speak the AI response out loud with high-fidelity, youthful voice (Neerja / Ava / Emma)
-        this.setState('ai_speaking', 'AI Teacher is speaking 🔊');
-        await SpeechService.speak(aiReplyText, {
-          voiceName: this.currentOptions?.voiceName || 'en-IN-NeerjaExpressiveNeural',
-          rate: 1.0,
-          onDone: () => {
-            this._prepareNextListeningTurn();
-          },
-          onError: () => {
-            this._prepareNextListeningTurn();
-          },
-        });
-        return;
+      let correctionData: CorrectionData | null = null;
+      if (convRes.correctedEnglish && convRes.correctedEnglish.trim().toLowerCase() !== transcribedText.trim().toLowerCase()) {
+        correctionData = {
+          original: transcribedText,
+          corrected: convRes.correctedEnglish,
+          explanation: convRes.correctionHindi || 'Grammar improvement',
+          formulaId: null,
+        };
       }
 
-      // 5. Send turn to Gemini Live WebSocket
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        console.log('[GeminiLiveClient] Sending user turn to Gemini Live WebSocket...');
-        this.ws.send(JSON.stringify({
-          clientContent: {
-            turns: [
-              {
-                role: 'user',
-                parts: [{ text: transcribedText }],
-              },
-            ],
-            turnComplete: true,
-          },
-        }));
-      } else {
-        console.warn('[GeminiLiveClient] WebSocket closed, cannot send turn.');
-        this.setState('error', 'Voice connection lost. Tap mic to reconnect.');
-      }
+      const aiReplyText = convRes.reply;
+      const newTurn: TurnMessage = {
+        id: `turn_m_${Date.now()}`,
+        role: 'model',
+        text: aiReplyText,
+        timestamp: Date.now(),
+        correction: correctionData,
+        isStreaming: false,
+      };
+
+      this.turns.push(newTurn);
+      this.callbacks.onTurnUpdate([...this.turns]);
+
+      // Speak the AI response out loud with high-fidelity, youthful voice (Neerja / Ava / Emma)
+      this.setState('ai_speaking', 'AI Teacher is speaking 🔊');
+      await SpeechService.speak(aiReplyText, {
+        voiceName: this.currentOptions?.voiceName || 'en-IN-NeerjaExpressiveNeural',
+        rate: 1.0,
+        onDone: () => {
+          this._prepareNextListeningTurn();
+        },
+        onError: () => {
+          this._prepareNextListeningTurn();
+        },
+      });
+      return;
     } catch (err: any) {
       console.warn('[GeminiLiveClient] Error in turn completion:', err);
       this.setState('listening', 'Listening to you... Speak English naturally.');
@@ -972,6 +912,10 @@ export class GeminiLiveClient {
       return;
     }
 
+    if (this.state === 'processing') {
+      return;
+    }
+
     if (this.audioStream && this.isRecordingActive) {
       this._triggerTurnCompletion();
       return;
@@ -985,17 +929,41 @@ export class GeminiLiveClient {
         this.fallbackRecorder = null;
         await rec.stop();
         const uri = rec.uri;
-        if (uri && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (uri) {
           const base64Audio = await readUriAsBase64(uri);
-          this.ws.send(JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [{ mimeType: 'audio/mp4', data: base64Audio }],
-            },
-          }));
-          this.ws.send(JSON.stringify({ clientContent: { turnComplete: true } }));
+          const transcribedText = await transcribeSpeech(base64Audio);
+          if (transcribedText) {
+            this._updateUserTurn(transcribedText, false);
+            this.setState('processing', 'AI Teacher is thinking...');
+            const convRes = await AIClient.conversationStep(
+              transcribedText,
+              this.currentOptions?.topic || 'daily_life',
+              this.turns.slice(-6).map((t) => ({ sender: t.role === 'user' ? 'user' : 'ai', text: t.text }))
+            );
+            const aiReplyText = convRes.reply;
+            const newTurn: TurnMessage = {
+              id: `turn_m_${Date.now()}`,
+              role: 'model',
+              text: aiReplyText,
+              timestamp: Date.now(),
+              isStreaming: false,
+            };
+            this.turns.push(newTurn);
+            this.callbacks.onTurnUpdate([...this.turns]);
+            this.setState('ai_speaking', 'AI Teacher is speaking 🔊');
+            await SpeechService.speak(aiReplyText, {
+              voiceName: this.currentOptions?.voiceName || 'en-IN-NeerjaExpressiveNeural',
+              rate: 1.0,
+              onDone: () => this._prepareNextListeningTurn(),
+              onError: () => this._prepareNextListeningTurn(),
+            });
+          } else {
+            this._prepareNextListeningTurn();
+          }
         }
       } catch (e) {
-        console.warn('[GeminiLiveClient] Fallback send error:', e);
+        console.warn('[GeminiLiveClient] Fallback turn error:', e);
+        this._prepareNextListeningTurn();
       }
     }
   }

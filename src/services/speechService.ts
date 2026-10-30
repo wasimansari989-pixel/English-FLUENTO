@@ -131,7 +131,7 @@ export const SpeechService = {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: cleanText, voice: edgeVoice }),
-              signal: AbortSignal.timeout(3500),
+              signal: AbortSignal.timeout(10000),
             });
 
             if (res.ok) {
@@ -142,7 +142,9 @@ export const SpeechService = {
               }
             }
           } catch {
-            // Try next candidate URL
+            // Direct streaming MP3 URL fallback
+            audioUri = `${baseUrl}/api/ai/tts?text=${encodeURIComponent(cleanText)}&voice=${encodeURIComponent(edgeVoice)}`;
+            break;
           }
         }
       } catch (backendErr) {
