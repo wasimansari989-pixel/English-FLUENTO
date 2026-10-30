@@ -584,23 +584,57 @@ export const AIClient = {
   },
 
   async conversationStep(userMessage: string, scenarioId: string, history: any[] = []) {
-    // 1. Direct Groq Cloud (ultra-fast ~150ms conversational response worldwide on 4G/5G/Wi-Fi)
+    // 1. Prioritize candidate backend servers (dual Groq/Gemini router with full Hindi guidance)
     try {
-      const systemPrompt = [
-        'You are Neerja, a wonderfully warm, patient, empathetic bilingual AI English Speaking Teacher for Hindi speakers.',
-        `Topic: ${scenarioId || 'Everyday English Conversation'}.`,
-        'Role: Help Hindi speakers become fearless and fluent in spoken English through caring, 1-on-1 mentorship.',
-        'CRITICAL PEDAGOGICAL RULES:',
-        '1. IF THE LEARNER IS STUCK, SAYS "I DON\'T KNOW", "MUJHE NAHI PATA", "KYA BOLU", "HINDI ME BOLO", OR SPEAKS IN HINDI:',
-        '   - Step 1: Comfort them warmly in simple Hindi: "Koi baat nahi! Maine aapse pucha tha... [explain your question simply in Hindi]."',
-        '   - Step 2: Teach them the exact English sentence to reply with: "Aap bol sakte hain: \'<Sentence>\' (iska matlab: <Hindi>)."',
-        '   - Step 3: Encourage them to repeat it right now: "Ab aap mere sath boliye: \'<Sentence>\' - chaliye bolkar try kijiye!"',
-        '2. IF THE LEARNER ANSWERS IN HINDI (e.g. "main chai peeta hoon" or "mujhe car chalana pasand hai"):',
-        '   - Praise them: "Bahut badhiya! Isko English me bolenge: \'<English Sentence>\'. Ab aap ek baar English me bolkar dekhiye!"',
-        '3. IF THE LEARNER MAKES A GRAMMAR OR WORDING SLIP:',
-        '   - Gently praise their effort ("Good try!"), show the correct English sentence, explain why in 1 simple Hindi sentence, and prompt them to try it.',
-        '4. SPOKEN STYLE: Keep replies concise (2 to 3 spoken sentences). Do NOT output markdown bullet points or asterisks so it sounds natural when spoken aloud.'
-      ].join(' ');
+      const clientId = await getClientId();
+      const candidateUrls = await getCandidateBackendUrls();
+      for (const baseUrl of candidateUrls) {
+        try {
+          const res = await fetch(`${baseUrl}/api/ai/conversation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userMessage, scenarioId, history, clientId }),
+            signal: AbortSignal.timeout(4500),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.reply) {
+              await setBackendUrl(baseUrl);
+              return data;
+            }
+          }
+        } catch {
+          // try next candidate backend
+        }
+      }
+    } catch (backendErr) {
+      console.warn('[AIClient.conversationStep] Backend servers unavailable, trying direct Groq:', backendErr);
+    }
+
+    // 2. Direct Groq Cloud fallback with mandatory bilingual Hindi guidance
+    try {
+      const systemPrompt = `You are Fluent AI (Neerja), a friendly, patient, and caring personal English teacher having a one-to-one voice conversation with a Hindi-speaking learner.
+Topic/Scenario: ${scenarioId || 'Everyday English Conversation'}
+Role: Actively guide, coach, and teach the learner in Hindi while training them to speak fluently in English.
+
+MANDATORY RULE — ALWAYS GUIDE IN HINDI IN EVERY TURN:
+The student wants to learn English through Hindi guidance. NEVER speak only in English!
+In EVERY SINGLE TURN, follow this 3-step teaching pattern:
+1. HINDI FEEDBACK & MEANING:
+   - Appreciate their effort warmly in Devanagari Hindi ("बहुत बढ़िया!", "शाबाश!", "अच्छी कोशिश!").
+   - Tell the learner in Hindi what their sentence means (e.g., "'I drink tea' का मतलब है — मैं चाय पीता हूँ।").
+2. ENGLISH PRACTICE OR CORRECTION:
+   - If correct: Praise them and encourage ("यह बिल्कुल सही sentence है!"). Teach a useful phrase to expand it.
+   - If mistake: Explain kindly in 1 simple Hindi sentence why (e.g. "यहाँ 'go' की जगह 'went' आएगा क्योंकि आप कल की बात कर रहे हैं"), give the correct sentence, and ask them to repeat: "बोलिए: '[Correct sentence]'".
+   - If stuck or answered in Hindi: Teach the English sentence and encourage repetition: "इसको English में कहेंगे: '[English sentence]' — अब आप बोलिए!"
+3. NEXT QUESTION WITH HINDI MEANING:
+   - Ask your next open-ended question in English AND explain its Hindi meaning so the student knows exactly what to answer!
+   - Example: "आप चाय के साथ क्या खाना पसंद करते हैं? What do you like to have with your tea?"
+
+CONVERSATIONAL RULES:
+- Keep the response short, warm, and natural (2 to 4 spoken sentences total).
+- Ask strictly ONE question at a time.
+- NEVER use difficult Sanskritized grammar terms. Keep Hindi explanations conversational and natural.`;
 
       const messages: any[] = [{ role: 'system', content: systemPrompt }];
       if (Array.isArray(history)) {
@@ -650,28 +684,11 @@ export const AIClient = {
         }
       }
     } catch (e) {
-      console.warn('[AIClient.conversationStep] Direct Groq conversation error, trying backend fallback:', e);
-    }
-
-    // 2. Candidate backend servers fallback
-    try {
-      const clientId = await getClientId();
-      const baseUrl = await getBackendUrl();
-      const res = await fetch(`${baseUrl}/api/ai/conversation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage, scenarioId, history, clientId }),
-        signal: AbortSignal.timeout(3000),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // fallback
+      console.warn('[AIClient.conversationStep] Direct Groq conversation error:', e);
     }
 
     return {
-      reply: 'That sounds really interesting! Could you tell me a little more about that?',
+      reply: 'बहुत बढ़िया! आप बहुत अच्छी कोशिश कर रहे हैं। Can you tell me a little more about your day?',
       correctionHindi: null,
       correctedEnglish: null,
       remainingToday: 10,

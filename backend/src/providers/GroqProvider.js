@@ -4,7 +4,7 @@ class GroqProvider extends AIProvider {
   constructor(apiKey, model) {
     super();
     this.apiKey = apiKey || process.env.GROQ_API_KEY;
-    this.model = model || process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+    this.model = model || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
   }
 
   async generateText({ systemPrompt, userPrompt, context }) {
