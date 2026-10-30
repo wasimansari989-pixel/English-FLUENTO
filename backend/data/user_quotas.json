@@ -1,5 +1,27 @@
 {
-  "date": "2026-10-25",
-  "globalSuccessfulAnswers": 0,
-  "users": {}
+  "date": "2026-10-30",
+  "globalSuccessfulAnswers": 8,
+  "users": {
+    "::ffff:192.168.29.50": {
+      "successfulAnswers": 0,
+      "reserved": 0,
+      "lastRequestTimestamp": 0,
+      "minuteWindowStart": 1793367246529,
+      "minuteRequestCount": 0
+    },
+    "user_iu1t513k_mvtaavhk": {
+      "successfulAnswers": 6,
+      "reserved": 0,
+      "lastRequestTimestamp": 1793370413526,
+      "minuteWindowStart": 1793370357151,
+      "minuteRequestCount": 6
+    },
+    "::1": {
+      "successfulAnswers": 2,
+      "reserved": 0,
+      "lastRequestTimestamp": 1793377871999,
+      "minuteWindowStart": 1793377865456,
+      "minuteRequestCount": 2
+    }
+  }
 }

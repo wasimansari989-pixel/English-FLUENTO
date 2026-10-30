@@ -9,6 +9,7 @@ import {
   Platform,
   ViewStyle,
   TextStyle,
+  AccessibilityInfo,
 } from 'react-native';
 
 export const fluentTokens = {
@@ -31,76 +32,116 @@ export const fluentTokens = {
 /**
  * Animated Futuristic AI Orb with orbital rings, core glow, and orbital dot
  */
-export const FluentOrb: React.FC<{ size?: number; style?: ViewStyle }> = ({
+export const FluentOrb: React.FC<{
+  size?: number;
+  style?: ViewStyle;
+  state?: 'idle' | 'listening' | 'processing' | 'ai_speaking';
+}> = ({
   size = 104,
   style,
+  state = 'idle',
 }) => {
   const floatAnim = useRef(new Animated.Value(0)).current;
   const orbitAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Gentle floating
-    const floatLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -7,
-          duration: 1800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
+    let floatLoop: Animated.CompositeAnimation | null = null;
+    let orbitLoop: Animated.CompositeAnimation | null = null;
+    let pulseLoop: Animated.CompositeAnimation | null = null;
 
-    // Orbit ring rotation
-    const orbitLoop = Animated.loop(
-      Animated.timing(orbitAnim, {
-        toValue: 1,
-        duration: 8000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        floatAnim.setValue(0);
+        orbitAnim.setValue(0);
+        pulseAnim.setValue(1);
+        return;
+      }
 
-    // Pulse glow
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.25,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.95,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
+      // Dynamic speeds based on state
+      const orbitDuration =
+        state === 'processing' ? 3200 : state === 'listening' ? 5000 : state === 'ai_speaking' ? 4000 : 8000;
+      const pulseTarget =
+        state === 'listening' ? 1.35 : state === 'ai_speaking' ? 1.28 : state === 'processing' ? 1.15 : 1.1;
 
-    floatLoop.start();
-    orbitLoop.start();
-    pulseLoop.start();
+      // Gentle floating
+      floatLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatAnim, {
+            toValue: -7,
+            duration: 1800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 1800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      // Orbit ring rotation
+      orbitLoop = Animated.loop(
+        Animated.timing(orbitAnim, {
+          toValue: 1,
+          duration: orbitDuration,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+
+      // Pulse glow
+      pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: pulseTarget,
+            duration: state === 'listening' ? 800 : 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.95,
+            duration: state === 'listening' ? 800 : 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      floatLoop.start();
+      orbitLoop.start();
+      pulseLoop.start();
+    });
 
     return () => {
-      floatLoop.stop();
-      orbitLoop.stop();
-      pulseLoop.stop();
+      floatLoop?.stop();
+      orbitLoop?.stop();
+      pulseLoop?.stop();
     };
-  }, [floatAnim, orbitAnim, pulseAnim]);
+  }, [floatAnim, orbitAnim, pulseAnim, state]);
 
   const spin = orbitAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  const haloColor =
+    state === 'listening'
+      ? 'rgba(212, 255, 0, 0.45)'
+      : state === 'processing'
+      ? 'rgba(139, 92, 246, 0.45)'
+      : state === 'ai_speaking'
+      ? 'rgba(56, 189, 248, 0.45)'
+      : 'rgba(212, 255, 0, 0.22)';
+
+  const ringColor =
+    state === 'processing'
+      ? 'rgba(139, 92, 246, 0.7)'
+      : state === 'ai_speaking'
+      ? 'rgba(56, 189, 248, 0.7)'
+      : 'rgba(212, 255, 0, 0.6)';
 
   return (
     <View style={[styles.orbWrapper, { height: size + 46 }, style]}>
@@ -116,13 +157,15 @@ export const FluentOrb: React.FC<{ size?: number; style?: ViewStyle }> = ({
         ]}
       >
         {/* Outer Halo / Glow */}
-        <View
+        <Animated.View
           style={[
             styles.orbOuterHalo,
             {
               width: size + 34,
               height: size + 34,
               borderRadius: (size + 34) / 2,
+              backgroundColor: haloColor,
+              transform: [{ scale: pulseAnim }],
             },
           ]}
         />
@@ -130,33 +173,30 @@ export const FluentOrb: React.FC<{ size?: number; style?: ViewStyle }> = ({
         {/* Orbit Ring 1 */}
         <Animated.View
           style={[
-            styles.orbOrbitRing1,
+            styles.orbRing,
             {
               width: size + 24,
               height: size + 24,
               borderRadius: (size + 24) / 2,
+              borderColor: ringColor,
               transform: [{ rotate: spin }],
             },
           ]}
-        />
+        >
+          <View
+            style={[
+              styles.orbDot,
+              {
+                backgroundColor: state === 'processing' ? '#8B5CF6' : '#D4FF00',
+              },
+            ]}
+          />
+        </Animated.View>
 
-        {/* Orbit Ring 2 (Lime accent ring) */}
-        <Animated.View
-          style={[
-            styles.orbOrbitRing2,
-            {
-              width: size + 36,
-              height: size + 18,
-              borderRadius: (size + 36) / 2,
-              transform: [{ rotate: spin }],
-            },
-          ]}
-        />
-
-        {/* The Central Sphere */}
+        {/* Core Sphere */}
         <View
           style={[
-            styles.orbSphere,
+            styles.orbCore,
             {
               width: size,
               height: size,
@@ -164,26 +204,18 @@ export const FluentOrb: React.FC<{ size?: number; style?: ViewStyle }> = ({
             },
           ]}
         >
-          {/* Internal high-contrast core light */}
+          {/* Neon Lime Inner Pulse Core */}
           <Animated.View
             style={[
-              styles.orbCore,
+              styles.orbInnerGlow,
               {
                 transform: [{ scale: pulseAnim }],
+                backgroundColor:
+                  state === 'processing' ? 'rgba(139, 92, 246, 0.65)' : 'rgba(212, 255, 0, 0.55)',
               },
             ]}
           />
         </View>
-
-        {/* Orbiting Lime Dot */}
-        <Animated.View
-          style={[
-            styles.orbitDot,
-            {
-              transform: [{ scale: pulseAnim }],
-            },
-          ]}
-        />
       </Animated.View>
     </View>
   );
@@ -205,7 +237,7 @@ export const FluentCard: React.FC<{
 };
 
 /**
- * Premium Fluent Action Button (Lime / Ink / Light / Outline)
+ * Premium Fluent Action Button (Lime / Ink / Light / Outline) with Tactile Spring Press
  */
 export const FluentButton: React.FC<{
   title: string;
@@ -229,62 +261,110 @@ export const FluentButton: React.FC<{
   const isLight = variant === 'light';
   const isOutline = variant === 'outline';
 
+  const pressScale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (disabled) return;
+    Animated.spring(pressScale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (disabled) return;
+    Animated.spring(pressScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 35,
+      bounciness: 4,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.84}
-      onPress={onPress}
-      disabled={disabled}
-      style={[
-        styles.buttonBase,
-        isLime && styles.buttonLime,
-        isInk && styles.buttonInk,
-        isLight && styles.buttonLight,
-        isOutline && styles.buttonOutline,
-        disabled && styles.buttonDisabled,
-        style,
-      ]}
-    >
-      <Text
+    <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled}
         style={[
-          styles.buttonText,
-          isLime && styles.buttonTextLime,
-          isInk && styles.buttonTextInk,
-          isLight && styles.buttonTextLight,
-          isOutline && styles.buttonTextOutline,
-          disabled && styles.buttonTextDisabled,
-          textStyle,
+          styles.buttonBase,
+          isLime && styles.buttonLime,
+          isInk && styles.buttonInk,
+          isLight && styles.buttonLight,
+          isOutline && styles.buttonOutline,
+          disabled && styles.buttonDisabled,
+          style,
         ]}
       >
-        {title}
-      </Text>
-      {arrow && (
         <Text
           style={[
-            styles.arrowText,
+            styles.buttonText,
             isLime && styles.buttonTextLime,
             isInk && styles.buttonTextInk,
             isLight && styles.buttonTextLight,
             isOutline && styles.buttonTextOutline,
+            disabled && styles.buttonTextDisabled,
+            textStyle,
           ]}
         >
-          {' →'}
+          {title}
         </Text>
-      )}
-    </TouchableOpacity>
+        {arrow && (
+          <Text
+            style={[
+              styles.arrowText,
+              isLime && styles.buttonTextLime,
+              isInk && styles.buttonTextInk,
+              isLight && styles.buttonTextLight,
+              isOutline && styles.buttonTextOutline,
+            ]}
+          >
+            {' →'}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 /**
- * Step Progress Indicator Track
+ * Step Progress Indicator Track with Smooth Gliding Transition
  */
 export const FluentProgressTrack: React.FC<{ progressPercent: number; style?: ViewStyle }> = ({
   progressPercent,
   style,
 }) => {
   const clamped = Math.min(100, Math.max(0, progressPercent));
+  const animatedWidth = useRef(new Animated.Value(clamped)).current;
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        animatedWidth.setValue(clamped);
+        return;
+      }
+      Animated.timing(animatedWidth, {
+        toValue: clamped,
+        duration: 350,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
+  }, [clamped]);
+
+  const widthInterpolation = animatedWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <View style={[styles.progressTrack, style]}>
-      <View style={[styles.progressBar, { width: `${clamped}%` }]} />
+      <Animated.View style={[styles.progressBar, { width: widthInterpolation }]} />
     </View>
   );
 };
@@ -542,6 +622,97 @@ export interface FluentHeadingProps {
   containerStyle?: ViewStyle;
 }
 
+const KineticHeadingLine: React.FC<{
+  line: HeadingLineConfig;
+  index: number;
+  center: boolean;
+  fontSize: number;
+  lineHeight: number;
+}> = ({ line, index, center, fontSize, lineHeight }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        anim.setValue(1);
+        return;
+      }
+      anim.setValue(0);
+      timer = setTimeout(() => {
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 750,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          useNativeDriver: true,
+        }).start();
+      }, 60 + index * 110);
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [line]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [28, 0],
+  });
+
+  const rotateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-22deg', '0deg'],
+  });
+
+  const isPlain = typeof line === 'string';
+  const prefix = !isPlain ? (line as any).prefix : '';
+  const embossed = !isPlain ? (line as any).embossed : '';
+  const suffix = !isPlain ? (line as any).suffix : '';
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ perspective: 600 }, { translateY }, { rotateX }],
+        alignItems: center ? 'center' : 'flex-start',
+        overflow: 'visible',
+      }}
+    >
+      <Text
+        style={{
+          fontSize,
+          lineHeight,
+          fontWeight: '900',
+          letterSpacing: -1.2,
+          color: '#19191D',
+          textAlign: center ? 'center' : 'left',
+          includeFontPadding: false,
+          marginVertical: 1,
+        }}
+      >
+        {isPlain ? (
+          line
+        ) : (
+          <>
+            {prefix ? `${prefix.trimEnd()} ` : ''}
+            <Text
+              style={{
+                color: '#ECECF0',
+                textShadowColor: 'rgba(25, 25, 32, 0.35)',
+                textShadowOffset: { width: 1.8, height: 2.2 },
+                textShadowRadius: 3,
+              }}
+            >
+              {embossed}
+            </Text>
+            {suffix ? ` ${suffix.trimStart()}` : ''}
+          </>
+        )}
+      </Text>
+    </Animated.View>
+  );
+};
+
 export const FluentHeading: React.FC<FluentHeadingProps> = ({
   lines,
   center = false,
@@ -560,57 +731,16 @@ export const FluentHeading: React.FC<FluentHeadingProps> = ({
         containerStyle,
       ]}
     >
-      {lines.map((line, idx) => {
-        if (typeof line === 'string') {
-          return (
-            <Text
-              key={idx}
-              style={{
-                fontSize,
-                lineHeight,
-                fontWeight: '900',
-                letterSpacing: -1.2,
-                color: '#19191D',
-                textAlign: center ? 'center' : 'left',
-                includeFontPadding: false,
-                marginVertical: 1,
-              }}
-            >
-              {line}
-            </Text>
-          );
-        }
-
-        const { prefix, embossed, suffix } = line;
-        return (
-          <Text
-            key={idx}
-            style={{
-              fontSize,
-              lineHeight,
-              fontWeight: '900',
-              letterSpacing: -1.2,
-              color: '#19191D',
-              textAlign: center ? 'center' : 'left',
-              includeFontPadding: false,
-              marginVertical: 1,
-            }}
-          >
-            {prefix ? `${prefix.trimEnd()} ` : ''}
-            <Text
-              style={{
-                color: '#E7E7EA',
-                textShadowColor: 'rgba(25, 25, 32, 0.40)',
-                textShadowOffset: { width: 1.8, height: 2.2 },
-                textShadowRadius: 3,
-              }}
-            >
-              {embossed}
-            </Text>
-            {suffix ? ` ${suffix.trimStart()}` : ''}
-          </Text>
-        );
-      })}
+      {lines.map((line, idx) => (
+        <KineticHeadingLine
+          key={idx}
+          line={line}
+          index={idx}
+          center={center}
+          fontSize={fontSize}
+          lineHeight={lineHeight}
+        />
+      ))}
     </View>
   );
 };
@@ -632,6 +762,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(205, 182, 233, 0.22)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  orbRing: {
+    position: 'absolute',
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  orbDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    top: -4,
+  },
+  orbInnerGlow: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 9999,
   },
   orbOrbitRing1: {
     position: 'absolute',

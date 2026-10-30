@@ -16,6 +16,8 @@ export type SentenceCorrectionResult = {
   corrected: string;
   isCorrect: boolean;
   explanationHindi: string;
+  hindiMeaning?: string | null;
+  betterAlternative?: string | null;
   grammarTags: string[];
   suggestedFormulaIds: number[];
   practiceExample?: {
@@ -41,7 +43,25 @@ export type QuizQuestionType =
   | 'fill-blank'
   | 'helping-verb'
   | 'correct-sentence'
+  | 'grammar-correction'
+  | 'tense-practice'
+  | 'vocabulary-practice'
   | 'phrase-match';
+
+export type MistakeRecord = {
+  id: string;
+  questionId: string;
+  type: QuizQuestionType;
+  prompt: string;
+  hindiSubtext?: string;
+  selectedAnswer: string;
+  correctAnswer: string;
+  explanationHindi: string;
+  formulaId: number;
+  category?: string;
+  difficulty: ExplanationMode;
+  timestamp: number;
+};
 
 export type QuizQuestion = {
   id: string;

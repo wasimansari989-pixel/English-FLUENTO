@@ -20,6 +20,9 @@ import { getFormulaById } from '../src/search/formulaSearch';
 import { AIChatMessage as AIChatMessageType, ExplanationMode } from '../src/types/ai';
 import { SentenceFormula } from '../src/types/formula';
 import { Storage } from '../src/database/storage';
+import { WeakTopicsTracker } from '../src/services/weakTopicsTracker';
+import { NetworkService } from '../src/services/networkService';
+import { OfflineStatusBanner } from '../src/components/OfflineStatusBanner';
 import { colors, spacing, typography, radii, shadows } from '../src/theme';
 
 export default function AITeacherScreen() {
@@ -104,6 +107,20 @@ export default function AITeacherScreen() {
   };
 
   const handleSend = async (textToSend?: string) => {
+    // Check network connectivity first
+    if (!NetworkService.getIsOnline()) {
+      Alert.alert(
+        'Internet Required for AI Teacher',
+        'AI Personal Teacher requires an internet connection to generate explanations. All 600 formulas and quizzes are 100% available offline!',
+        [
+          { text: 'Formula Library', onPress: () => router.push('/formulas') },
+          { text: 'Offline Quiz', onPress: () => router.push('/practice') },
+          { text: 'Dismiss', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
     const q = (textToSend || inputQuery).trim();
     if (!q || loading) return;
 
@@ -122,17 +139,12 @@ export default function AITeacherScreen() {
     setInputQuery('');
     setLoading(true);
 
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      // Build conversation history for the AI tutor context
-      const historyPayload = messages
-        .slice(-4)
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      const res = await AIClient.askTutor(q, pinnedFormula?.id, mode, historyPayload);
+      const historyPayload = messages.slice(-4).map((m) => ({ role: m.role, content: m.content }));
+      const weakTags = await WeakTopicsTracker.getTopWeakTags(5);
+      const res = await AIClient.askTutor(q, pinnedFormula?.id, mode, historyPayload, weakTags);
       const assistantMessage: AIChatMessageType = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
@@ -146,12 +158,8 @@ export default function AITeacherScreen() {
       setMessages(updatedAfterAi);
       saveHistory(updatedAfterAi);
 
-      if (res.fallbackUsed) {
-        setFallbackActive(true);
-      }
-      if (res.remainingToday !== undefined) {
-        setQuotaRemaining(res.remainingToday);
-      }
+      if (res.fallbackUsed) setFallbackActive(true);
+      if (res.remainingToday !== undefined) setQuotaRemaining(res.remainingToday);
     } catch (err: any) {
       const errorMsg: AIChatMessageType = {
         id: `err-${Date.now()}`,
@@ -164,11 +172,75 @@ export default function AITeacherScreen() {
       saveHistory(updatedAfterErr);
     } finally {
       setLoading(false);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 150);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
     }
   };
+
+  // New: Sentence correction action
+  const handleCorrectSentence = async () => {
+    const sentence = inputQuery.trim();
+    if (!sentence || loading) return;
+
+    // Show user sentence as a message
+    const userMsg: AIChatMessageType = {
+      id: `user-correct-${Date.now()}`,
+      role: 'user',
+      content: `✏️ ${sentence}`,
+      timestamp: Date.now(),
+    };
+    const afterUser = [...messages, userMsg];
+    setMessages(afterUser);
+    saveHistory(afterUser);
+    setInputQuery('');
+    setLoading(true);
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    try {
+      const res: any = await AIClient.correctSentence(sentence, mode);
+      // Build rich correction message
+      let correctionText = '';
+      if (res.isCorrect) {
+        correctionText = `✅ **Your sentence is correct!**\n\n📖 ${res.explanationHindi}`;
+      } else {
+        correctionText = `✅ **Correct sentence:** ${res.corrected}\n\n📖 **Explanation:** ${res.explanationHindi}\n\n🇮🇳 **Hindi meaning:** ${res.hindiMeaning || res.practiceExample?.hindi || ''}\n\n💡 **Better alternative:** ${res.betterAlternative || 'N/A'}`;
+      }
+      if (res.practiceExample?.english) {
+        correctionText += `\n\n🔄 **Practice:** ${res.practiceExample.english}`;
+      }
+      const aiMsg: AIChatMessageType = {
+        id: `ai-correct-${Date.now()}`,
+        role: 'assistant',
+        content: correctionText,
+        timestamp: Date.now(),
+        suggestedFollowUps: [
+          'Ek aur sentence correct karo.',
+          'Is grammar rule ko detail mein samjhao.',
+          '5 similar examples do.',
+        ],
+      };
+      const updated = [...afterUser, aiMsg];
+      setMessages(updated);
+      saveHistory(updated);
+      if (res.remainingToday !== undefined) setQuotaRemaining(res.remainingToday);
+      // Track weak grammar topics for personalization
+      if (!res.isCorrect && Array.isArray(res.grammarTags)) {
+        WeakTopicsTracker.recordMistake(res.grammarTags);
+      }
+    } catch (e: any) {
+      const errMsg: AIChatMessageType = {
+        id: `err-correct-${Date.now()}`,
+        role: 'assistant',
+        content: `⚠️ ${e.message || 'Error correcting sentence.'}`,
+        timestamp: Date.now(),
+      };
+      const updated = [...afterUser, errMsg];
+      setMessages(updated);
+      saveHistory(updated);
+    } finally {
+      setLoading(false);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
+    }
+  };
+
 
   const clearChat = () => {
     Alert.alert('Clear Chat', 'Are you sure you want to clear conversation history?', [
@@ -244,6 +316,9 @@ export default function AITeacherScreen() {
         </View>
       </TouchableOpacity>
 
+      {/* Offline Status Banner */}
+      <OfflineStatusBanner />
+
       {/* Pinned Formula Context Card */}
       {pinnedFormula && (
         <View style={styles.contextCardWrapper}>
@@ -296,7 +371,7 @@ export default function AITeacherScreen() {
         )}
       </ScrollView>
 
-      {/* Input Row with Solid Coral Orange Send Button */}
+      {/* Input Row with Correct + Send Buttons */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -308,6 +383,17 @@ export default function AITeacherScreen() {
           multiline
           maxLength={1000}
         />
+        {/* Correct Sentence button */}
+        <TouchableOpacity
+          style={[styles.correctBtn, !inputQuery.trim() && styles.correctBtnDisabled]}
+          onPress={handleCorrectSentence}
+          disabled={!inputQuery.trim() || loading}
+          accessibilityLabel="Correct sentence"
+          activeOpacity={0.8}
+        >
+          <Ionicons name="brush" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
+        {/* Send button */}
         <TouchableOpacity
           style={[styles.sendButton, !inputQuery.trim() && styles.sendButtonDisabled]}
           onPress={() => handleSend()}
@@ -442,6 +528,20 @@ const styles = StyleSheet.create({
     ...shadows.limeGlow,
   },
   sendButtonDisabled: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    opacity: 0.4,
+  },
+  correctBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.orange || '#FF6B35',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  correctBtnDisabled: {
     backgroundColor: colors.surfaceElevated,
     borderColor: colors.borderSubtle,
     borderWidth: 1,

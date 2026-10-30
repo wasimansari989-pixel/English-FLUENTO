@@ -1,5 +1,14 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Easing,
+  Platform,
+  AccessibilityInfo,
+} from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,31 +34,106 @@ interface BottomNavBarProps {
   activeTab?: 'home' | 'formulas' | 'ai-voice' | 'practice' | 'progress';
 }
 
+const AnimatedNavTab: React.FC<{
+  item: NavItem;
+  active: boolean;
+  onPress: () => void;
+}> = ({ item, active, onPress }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (active) {
+      scaleAnim.setValue(0.92);
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [active]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.94,
+      speed: 50,
+      bounciness: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      speed: 35,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[
+          styles.navPill,
+          active && styles.navPillActive,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        accessibilityState={{ selected: active }}
+      >
+        <Text
+          style={[
+            styles.navLabel,
+            active && styles.navLabelActive,
+          ]}
+          numberOfLines={1}
+        >
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab }) => {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const centerScaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.15,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1.0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
+    let loop: Animated.CompositeAnimation | null = null;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        pulseAnim.setValue(1);
+        return;
+      }
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.15,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.0,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      loop.start();
+    });
+
+    return () => loop?.stop();
   }, [pulseAnim]);
 
   const isCurrentActive = (route: string, id: string) => {
@@ -61,6 +145,24 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab }) => {
   const handleNav = (targetRoute: string, targetId: string) => {
     if (isCurrentActive(targetRoute, targetId)) return;
     router.replace(targetRoute as any);
+  };
+
+  const handleCenterPressIn = () => {
+    Animated.spring(centerScaleAnim, {
+      toValue: 0.9,
+      speed: 50,
+      bounciness: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCenterPressOut = () => {
+    Animated.spring(centerScaleAnim, {
+      toValue: 1,
+      speed: 35,
+      bounciness: 5,
+      useNativeDriver: true,
+    }).start();
   };
 
   return (
@@ -77,48 +179,38 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab }) => {
 
           if (item.isCenter) {
             return (
-              <TouchableOpacity
+              <Animated.View
                 key={item.id}
-                activeOpacity={0.88}
-                onPress={() => handleNav(item.route, item.id)}
-                style={styles.centerButton}
-                accessibilityRole="button"
-                accessibilityLabel="AI Voice Speaking Teacher"
+                style={{ transform: [{ scale: centerScaleAnim }] }}
               >
-                <Animated.View
-                  style={[
-                    styles.centerButtonGlow,
-                    { transform: [{ scale: pulseAnim }] },
-                  ]}
-                />
-                <Ionicons name="mic" size={20} color="#0A0A0A" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  onPress={() => handleNav(item.route, item.id)}
+                  onPressIn={handleCenterPressIn}
+                  onPressOut={handleCenterPressOut}
+                  style={styles.centerButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="AI Voice Speaking Teacher"
+                >
+                  <Animated.View
+                    style={[
+                      styles.centerButtonGlow,
+                      { transform: [{ scale: pulseAnim }] },
+                    ]}
+                  />
+                  <Ionicons name="mic" size={20} color="#0A0A0A" />
+                </TouchableOpacity>
+              </Animated.View>
             );
           }
 
           return (
-            <TouchableOpacity
+            <AnimatedNavTab
               key={item.id}
-              activeOpacity={0.8}
+              item={item}
+              active={active}
               onPress={() => handleNav(item.route, item.id)}
-              style={[
-                styles.navPill,
-                active && styles.navPillActive,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              accessibilityState={{ selected: active }}
-            >
-              <Text
-                style={[
-                  styles.navLabel,
-                  active && styles.navLabelActive,
-                ]}
-                numberOfLines={1}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
+            />
           );
         })}
       </View>

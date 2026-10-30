@@ -1,5 +1,46 @@
 {
   "hits": 0,
-  "misses": 0,
-  "data": {}
+  "misses": 8,
+  "data": {
+    "correction_e7337e60c0ffd0d0": {
+      "value": "{\n  \"original\": \"I wake up early and brush my teeth.\",\n  \"corrected\": \"I wake up early and brush my teeth.\",\n  \"isCorrect\": true,\n  \"explanationHindi\": \"यह वाक्य सही है। यहाँ present simple tense का प्रयोग हुआ है और दो क्रियाएँ (wake up, brush) को 'and' से जोड़ा गया है। subject‑verb agreement भी ठीक है।\",\n  \"hindiMeaning\": \"मैं जल्दी उठता हूँ और अपने दाँत ब्रश करता हूँ।\",\n  \"betterAlternative\": \"I get up early and brush my teeth.\",\n  \"grammarTags\": [\"present simple\", \"compound verb\", \"subject-verb agreement\"],\n  \"suggestedFormulaIds\": [],\n  \"practiceExample\": {\n    \"english\": \"Make a sentence about your morning routine using present simple tense.\",\n    \"hindi\": \"अपने सुबह के रूटीन के बारे में present simple में एक वाक्य बनाइए।\"\n  }\n}",
+      "createdAt": 1793370358472,
+      "expiresAt": 1793456758472
+    },
+    "correction_1c4a6c36b9e0de7e": {
+      "value": "{\n  \"original\": \"I can't understand what you can do in Hindi.\",\n  \"corrected\": \"I can't understand what you can do in Hindi.\",\n  \"isCorrect\": true,\n  \"explanationHindi\": \"यह वाक्य व्याकरण की दृष्टि से सही है। 'can't understand' (नहीं समझ पा रहा/रही) + 'what you can do in Hindi' (आप हिंदी में क्या कर सकते हैं) एक सही indirect question बनाता है। कोई गलती नहीं है।\",\n  \"hindiMeaning\": \"मैं नहीं समझ पा रहा/रही कि आप हिंदी में क्या कर सकते हैं।\",\n  \"betterAlternative\": \"I don't understand what you can do in Hindi.\",\n  \"grammarTags\": [\"modal verb\", \"negation\", \"indirect question\"],\n  \"suggestedFormulaIds\": [],\n  \"practiceExample\": {\n    \"english\": \"Make a sentence using \\\"can't understand\\\" with a different activity, e.g., \\\"I can't understand why he left early.\\\"\",\n    \"hindi\": \"\\\"can't understand\\\" का उपयोग करके कोई और वाक्य बनाइए, जैसे \\\"I can't understand why he left early.\\\"\"\n  }\n}",
+      "createdAt": 1793370378839,
+      "expiresAt": 1793456778839
+    },
+    "conversation_02820000d316ad00": {
+      "value": "{\n  \"reply\": \"I'm happy to help you in Hindi—just let me know what you'd like to talk about or ask. Is there something specific you want to try in Hindi?\",\n  \"correctionHindi\": null,\n  \"correctedEnglish\": null\n}",
+      "createdAt": 1793370380726,
+      "expiresAt": 1793456780726
+    },
+    "correction_ae63393fc66fb485": {
+      "value": "{\n  \"original\": \"Aha.\",\n  \"corrected\": \"Aha.\",\n  \"isCorrect\": true,\n  \"explanationHindi\": \"यह एक interjection (भावनात्मक शब्द) है, जैसे 'आहा' या 'हूँ'। यह सही है और किसी सुधार की जरूरत नहीं है।\",\n  \"hindiMeaning\": \"आहा।\",\n  \"betterAlternative\": null,\n  \"grammarTags\": [\"interjection\"],\n  \"suggestedFormulaIds\": [],\n  \"practiceExample\": {\n    \"english\": \"Write another short interjection like \\\"Wow!\\\" or \\\"Oops!\\\".\",\n    \"hindi\": \"एक और छोटा interjection लिखिए, जैसे \\\"Wow!\\\" या \\\"Oops!\\\".\"\n  }\n}",
+      "createdAt": 1793370397454,
+      "expiresAt": 1793456797454
+    },
+    "correction_3a5e60d22041288c": {
+      "value": "{\n  \"original\": \"Can you talk about this in India?\",\n  \"corrected\": \"Can you talk about this in India?\",\n  \"isCorrect\": true,\n  \"explanationHindi\": \"यह वाक्य व्याकरण की दृष्टि से सही है। ‘Can’ (modal verb) + subject + main verb ‘talk’ + preposition ‘in’ + place ‘India’ का क्रम ठीक है। बस अगर आप ‘while you are in India’ कहना चाहते हैं तो थोड़ा अलग भी कह सकते हैं, लेकिन मूल वाक्य गलत नहीं है।\",\n  \"hindiMeaning\": \"क्या आप भारत में इसके बारे में बात कर सकते हैं?\",\n  \"betterAlternative\": \"Can you discuss this while you're in India?\",\n  \"grammarTags\": [\"question\", \"modal-verb\", \"preposition\"],\n  \"suggestedFormulaIds\": [],\n  \"practiceExample\": {\n    \"english\": \"Make a sentence using ‘Can you … in …’ with a different place, e.g., ‘Can you speak English in Canada?’\",\n    \"hindi\": \"‘Can you … in …’ का उपयोग करके कोई दूसरा वाक्य बनाइए, जैसे ‘Can you speak English in Canada?’\"\n  }\n}",
+      "createdAt": 1793370412551,
+      "expiresAt": 1793456812551
+    },
+    "conversation_0ddb578bad01ec61": {
+      "value": "{\n  \"reply\": \"Sure! In India, daily life is full of vibrant markets, diverse cuisines, and bustling streets—what aspect of Indian daily life would you like to hear about?\",\n  \"correctionHindi\": \"आपने \\\"in India\\\" लिखा है, लेकिन आपका मतलब शायद \\\"in Hindi\\\" था, यानी हिंदी में बात करना।\",\n  \"correctedEnglish\": \"Can you talk about this in Hindi?\"\n}",
+      "createdAt": 1793370414618,
+      "expiresAt": 1793456814618
+    },
+    "conversation_73dae412a161025d": {
+      "value": "{\n  \"reply\": \"Yes, I can speak Hindi. Aap mujhse Hindi mein baat kar sakte hain, aur main aapko English practice mein madad karungi. Let me know what you’d like to talk about today!\",\n  \"correctionHindi\": null,\n  \"correctedEnglish\": null\n}",
+      "createdAt": 1793377866585,
+      "expiresAt": 1793464266585
+    },
+    "conversation_3b836be93fd7bee6": {
+      "value": "{\n  \"reply\": \"Koi baat nahi! Main aapse pooch raha tha ki aap subah uthne ke baad kya karte hain? Aap bol sakte hain: \\\"I brush my teeth and then have breakfast.\\\" (iska matlab hai: मैं अपने दाँत ब्रश करता/करती हूँ और फिर नाश्ता करता/करती हूँ.) Ab aap mere sath boliye: \\\"I brush my teeth and then have breakfast.\\\" - chaliye boliye!\",\n  \"correctionHindi\": null,\n  \"correctedEnglish\": null\n}",
+      "createdAt": 1793377873308,
+      "expiresAt": 1793464273308
+    }
+  }
 }

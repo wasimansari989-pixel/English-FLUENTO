@@ -1,5 +1,15 @@
-import React from 'react';
-import { Text, StyleSheet, TextStyle, StyleProp, View, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import {
+  Text,
+  StyleSheet,
+  TextStyle,
+  StyleProp,
+  View,
+  Platform,
+  Animated,
+  Easing,
+  AccessibilityInfo,
+} from 'react-native';
 import { SentenceSegment } from '../types/formula';
 import { colors, radii } from '../theme';
 
@@ -11,6 +21,61 @@ interface HighlightedSentenceProps {
   style?: StyleProp<TextStyle>;
   isDark?: boolean;
 }
+
+const AnimatedHighlightSpan: React.FC<{
+  text: string;
+  isDark: boolean;
+  isHindi: boolean;
+  delayIndex: number;
+}> = ({ text, isDark, isHindi, delayIndex }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        anim.setValue(1);
+        return;
+      }
+      anim.setValue(0);
+      timer = setTimeout(() => {
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 380,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }).start();
+      }, 80 + delayIndex * 50);
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [text]);
+
+  const targetBg = isDark
+    ? isHindi
+      ? 'rgba(255, 59, 48, 0.24)'
+      : 'rgba(255, 59, 48, 0.24)'
+    : 'rgba(255, 59, 48, 0.16)';
+
+  const animatedBg = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 59, 48, 0.0)', targetBg],
+  });
+
+  return (
+    <Animated.Text
+      style={[
+        styles.highlightedText,
+        isDark && (isHindi ? styles.highlightedTextDarkHindi : styles.highlightedTextDark),
+        { backgroundColor: animatedBg },
+      ]}
+    >
+      {text}
+    </Animated.Text>
+  );
+};
 
 export const HighlightedSentence: React.FC<HighlightedSentenceProps> = React.memo(({
   segments,
@@ -55,15 +120,13 @@ export const HighlightedSentence: React.FC<HighlightedSentenceProps> = React.mem
       {segments.map((segment, index) => {
         if (segment.highlight) {
           return (
-            <Text
+            <AnimatedHighlightSpan
               key={`${index}-${segment.text}`}
-              style={[
-                styles.highlightedText,
-                isDark && (isHindi ? styles.highlightedTextDarkHindi : styles.highlightedTextDark),
-              ]}
-            >
-              {segment.text}
-            </Text>
+              text={segment.text}
+              isDark={isDark}
+              isHindi={isHindi}
+              delayIndex={index}
+            />
           );
         }
         return (

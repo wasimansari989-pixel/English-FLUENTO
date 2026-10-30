@@ -1,5 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  Animated,
+  AccessibilityInfo,
+} from 'react-native';
 import { SentenceFormula } from '../types/formula';
 import { HighlightedSentence } from './HighlightedSentence';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +51,50 @@ export const FormulaCard: React.FC<FormulaCardProps> = React.memo(({
   const firstExample = formula.examples && formula.examples.length > 0 ? formula.examples[0] : null;
   const catStyle = getCategoryStyle(formula.category);
 
+  const cardScale = useRef(new Animated.Value(1)).current;
+  const bookmarkScale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(cardScale, {
+      toValue: 0.985,
+      speed: 50,
+      bounciness: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(cardScale, {
+      toValue: 1,
+      speed: 35,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleBookmarkPress = () => {
+    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
+      if (reduced) {
+        onToggleBookmark?.();
+        return;
+      }
+      Animated.sequence([
+        Animated.timing(bookmarkScale, {
+          toValue: 1.35,
+          duration: 130,
+          useNativeDriver: true,
+        }),
+        Animated.spring(bookmarkScale, {
+          toValue: 1,
+          friction: 3.5,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      onToggleBookmark?.();
+    });
+  };
+
   // Helper to render formula syntax tokens with structured high-clarity typography
   const renderFormulaSyntax = () => {
     const raw = formula.englishFormula || '';
@@ -74,62 +126,67 @@ export const FormulaCard: React.FC<FormulaCardProps> = React.memo(({
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={onPress}
-      style={styles.card}
-      accessibilityRole="button"
-      accessibilityLabel={`Formula ${formula.id}: ${formula.englishFormula}`}
-    >
-      {/* 1. Header Metadata Row: ID Badge + Category + Action Buttons */}
-      <View style={styles.topRow}>
-        <View style={styles.headerLeft}>
-          <View style={styles.idBadge}>
-            <Text style={styles.idBadgeHash}>#</Text>
-            <Text style={styles.idBadgeNumber}>{formula.id}</Text>
+    <Animated.View style={{ transform: [{ scale: cardScale }] }}>
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={styles.card}
+        accessibilityRole="button"
+        accessibilityLabel={`Formula ${formula.id}: ${formula.englishFormula}`}
+      >
+        {/* 1. Header Metadata Row: ID Badge + Category + Action Buttons */}
+        <View style={styles.topRow}>
+          <View style={styles.headerLeft}>
+            <View style={styles.idBadge}>
+              <Text style={styles.idBadgeHash}>#</Text>
+              <Text style={styles.idBadgeNumber}>{formula.id}</Text>
+            </View>
+
+            <View style={[styles.categoryBadge, { backgroundColor: catStyle.bg, borderColor: catStyle.border }]}>
+              <View style={[styles.categoryDot, { backgroundColor: catStyle.text }]} />
+              <Text style={[styles.categoryBadgeText, { color: catStyle.text }]} numberOfLines={1}>
+                {formula.category}
+              </Text>
+            </View>
           </View>
 
-          <View style={[styles.categoryBadge, { backgroundColor: catStyle.bg, borderColor: catStyle.border }]}>
-            <View style={[styles.categoryDot, { backgroundColor: catStyle.text }]} />
-            <Text style={[styles.categoryBadgeText, { color: catStyle.text }]} numberOfLines={1}>
-              {formula.category}
-            </Text>
+          <View style={styles.headerRight}>
+            {onToggleBookmark && (
+              <Animated.View style={{ transform: [{ scale: bookmarkScale }] }}>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    handleBookmarkPress();
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.iconButton, isBookmarked && styles.iconButtonBookmarked]}
+                  accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+                >
+                  <Ionicons
+                    name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+                    size={17}
+                    color={isBookmarked ? '#E11D48' : '#111114'}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
+            {onAskAI && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onAskAI();
+                }}
+                style={styles.aiButton}
+                accessibilityLabel="Ask AI Tutor"
+              >
+                <Ionicons name="sparkles" size={13} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-
-        <View style={styles.headerRight}>
-          {onToggleBookmark && (
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onToggleBookmark();
-              }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[styles.iconButton, isBookmarked && styles.iconButtonBookmarked]}
-              accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
-            >
-              <Ionicons
-                name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-                size={17}
-                color={isBookmarked ? '#E11D48' : '#111114'}
-              />
-            </TouchableOpacity>
-          )}
-
-          {onAskAI && (
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onAskAI();
-              }}
-              style={styles.aiButton}
-              accessibilityLabel="Ask AI Tutor"
-            >
-              <Ionicons name="sparkles" size={13} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
       {/* 2. Structured English Formula Bar */}
       <View style={styles.formulaBox}>
@@ -216,6 +273,7 @@ export const FormulaCard: React.FC<FormulaCardProps> = React.memo(({
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 });
 

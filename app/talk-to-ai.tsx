@@ -11,12 +11,17 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  Alert,
+  ActivityIndicator,
+  Vibration,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import type { AudioRecorder } from 'expo-audio';
 import { colors, radii } from '../src/theme';
 import {
   GeminiLiveClient,
@@ -24,12 +29,68 @@ import {
   TurnMessage,
   CorrectionData,
 } from '../src/services/geminiLiveClient';
-import { AIClient } from '../src/services/aiClient';
+import { Storage } from '../src/database/storage';
+import { AIClient, getBackendUrl, transcribeSpeech } from '../src/services/aiClient';
+import { GamificationRepository } from '../src/database/gamificationRepository';
+import { NetworkService } from '../src/services/networkService';
+import { OfflineStatusBanner } from '../src/components/OfflineStatusBanner';
+import { readUriAsBase64 } from '../src/services/audioUtils';
+import { SpeechService, PronunciationResult } from '../src/services/speechService';
+import { PRONUNCIATION_TARGETS, PronunciationTarget } from '../src/data/pronunciationTargets';
 import { getFormulaById } from '../src/search/formulaSearch';
 import { HighlightedSentence } from '../src/components/HighlightedSentence';
 import { SentenceSegment } from '../src/types/formula';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export interface VoiceOption {
+  id: string;
+  name: string;
+  tagline: string;
+  hindiDesc: string;
+  badge: string;
+  avatar: string;
+  sampleText: string;
+}
+
+export const VOICE_OPTIONS: VoiceOption[] = [
+  {
+    id: 'en-IN-NeerjaExpressiveNeural',
+    name: 'Neerja',
+    tagline: 'Sweet Indian AI Teacher',
+    hindiDesc: 'अंग्रेजी और हिंदी दोनों में बेहद साफ़, प्यारी व युवा आवाज़',
+    badge: 'RECOMMENDED',
+    avatar: '🌸',
+    sampleText: 'Namaste! Main Neerja hoon, aapki AI English teacher. Chaliye saath mein English bolte hain!',
+  },
+  {
+    id: 'en-US-AvaMultilingualNeural',
+    name: 'Ava',
+    tagline: 'Modern Young AI (ChatGPT Style)',
+    hindiDesc: 'मॉडर्न, स्मार्ट और मधुर युवा आवाज़',
+    badge: 'POPULAR',
+    avatar: '🌟',
+    sampleText: "Hello! I am Ava, your personal AI speaking coach. Let's practice English together!",
+  },
+  {
+    id: 'en-US-EmmaMultilingualNeural',
+    name: 'Emma',
+    tagline: 'Cheerful & Lively Tutor',
+    hindiDesc: 'उत्साही और फ्रेंडली आवाज़',
+    badge: 'LIVELY',
+    avatar: '🌺',
+    sampleText: 'Hi there! I am Emma. I am super excited to help you become fluent in English!',
+  },
+  {
+    id: 'en-US-JennyNeural',
+    name: 'Jenny',
+    tagline: 'Warm & Natural English',
+    hindiDesc: 'नेचुरल और फ्रेंडली अमेरिकन ट्यूटर',
+    badge: 'NATURAL',
+    avatar: '✨',
+    sampleText: 'Hello! I am Jenny. Ready to practice speaking English today?',
+  },
+];
 
 interface TopicItem {
   id: string;
@@ -61,6 +122,9 @@ export default function TalkToAIScreen() {
     (params.mode as any) || 'beginner'
   );
   const [selectedTopic, setSelectedTopic] = useState<string>('daily_life');
+  const [selectedVoice, setSelectedVoice] = useState<string>('en-IN-NeerjaExpressiveNeural');
+  const [isVoiceModalVisible, setIsVoiceModalVisible] = useState<boolean>(false);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const contextFormulaId = params.formulaId ? parseInt(params.formulaId, 10) : null;
   const contextFormula = contextFormulaId ? getFormulaById(contextFormulaId) : null;
 
@@ -75,11 +139,42 @@ export default function TalkToAIScreen() {
   const [totalDailySeconds, setTotalDailySeconds] = useState<number>(600);
   const [usedTodaySeconds, setUsedTodaySeconds] = useState<number>(0);
   const [showTranscripts, setShowTranscripts] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<'conversation' | 'pronunciation'>('conversation');
+  const [pronunciationEvaluation, setPronunciationEvaluation] = useState<Record<string, PronunciationResult>>({});
+  const [activePracticingTargetId, setActivePracticingTargetId] = useState<string | null>(null);
+  const [isPronunciationRecording, setIsPronunciationRecording] = useState<boolean>(false);
+  const [isPronunciationPreparing, setIsPronunciationPreparing] = useState<boolean>(false);
+  const [isPronunciationEvaluating, setIsPronunciationEvaluating] = useState<boolean>(false);
+  const [recordingDurationSecs, setRecordingDurationSecs] = useState<number>(0);
+  const [playingTargetId, setPlayingTargetId] = useState<string | null>(null);
+  const pronunciationRecorderRef = useRef<AudioRecorder | null>(null);
+  const pronunciationStartTimeRef = useRef<number>(0);
+  const recordIntervalRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (isPronunciationRecording) {
+      setRecordingDurationSecs(0);
+      recordIntervalRef.current = setInterval(() => {
+        setRecordingDurationSecs((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (recordIntervalRef.current) {
+        clearInterval(recordIntervalRef.current);
+        recordIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (recordIntervalRef.current) {
+        clearInterval(recordIntervalRef.current);
+        recordIntervalRef.current = null;
+      }
+    };
+  }, [isPronunciationRecording]);
 
   // Custom Notice / Alert Modal State
   const [noticeModal, setNoticeModal] = useState<{
     visible: boolean;
-    type: 'quota_limit' | 'confirm_exit' | 'network_error';
+    type: 'quota_limit' | 'confirm_exit' | 'network_error' | 'could_not_hear' | 'permission_denied' | 'general_notice';
     title: string;
     badge: string;
     message: string;
@@ -142,7 +237,36 @@ export default function TalkToAIScreen() {
 
   useEffect(() => {
     loadQuota();
+    Storage.getItem('@english_formula_tutor_voice').then((saved) => {
+      if (saved && VOICE_OPTIONS.some((v) => v.id === saved)) {
+        setSelectedVoice(saved);
+      }
+    });
   }, []);
+
+  const handleSelectVoice = async (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    await Storage.setItem('@english_formula_tutor_voice', voiceId);
+    SpeechService.stop();
+    setPreviewingVoiceId(null);
+    setIsVoiceModalVisible(false);
+  };
+
+  const handlePreviewVoice = async (voice: VoiceOption) => {
+    if (previewingVoiceId) {
+      SpeechService.stop();
+      const prev = previewingVoiceId;
+      setPreviewingVoiceId(null);
+      if (prev === voice.id) return;
+    }
+    setPreviewingVoiceId(voice.id);
+    await SpeechService.speak(voice.sampleText, {
+      voiceName: voice.id,
+      rate: 1.0,
+      onDone: () => setPreviewingVoiceId(null),
+      onError: () => setPreviewingVoiceId(null),
+    });
+  };
 
   // Continuous subtle cosmic rotation
   useEffect(() => {
@@ -424,16 +548,37 @@ export default function TalkToAIScreen() {
 
     return () => {
       client.endSession();
+      SpeechService.stop();
     };
   }, [totalDailySeconds]);
 
   const handleStartSession = async () => {
+    if (!NetworkService.getIsOnline()) {
+      setNoticeModal({
+        visible: true,
+        type: 'network_error',
+        title: 'Offline / इंटरनेट कनेक्शन आवश्यक',
+        badge: 'OFFLINE',
+        message: 'Live voice conversation requires an active internet connection.',
+        hindiDetail: 'लाइव आवाज़ बातचीत के लिए इंटरनेट आवश्यक है। आप 600 फ़ॉर्मूले और क्विज़ ऑफ़लाइन भी पढ़ सकते हैं!',
+        primaryActionText: 'Explore Formulas / फ़ॉर्मूले देखें',
+        onPrimaryAction: () => {
+          setNoticeModal((prev) => ({ ...prev, visible: false }));
+          router.push('/formulas');
+        },
+        secondaryActionText: 'Close / बंद करें',
+        onSecondaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+      });
+      return;
+    }
+
     if (!clientRef.current) return;
     clientRef.current.setContinuousMode(continuousMode);
     await clientRef.current.startSession({
       mode: selectedMode,
       topic: selectedTopic,
       formulaId: contextFormulaId,
+      voiceName: selectedVoice,
     });
   };
 
@@ -443,6 +588,15 @@ export default function TalkToAIScreen() {
     setTimeout(() => {
       loadQuota();
     }, 400);
+
+    // Award XP if conversation took place
+    if (turns.length > 0) {
+      GamificationRepository.awardXp({
+        activityType: 'speaking_session',
+        title: 'Spoken English Conversation',
+        eventKey: `speaking_conv_${Date.now()}`,
+      });
+    }
   };
 
   const handleMicPress = async () => {
@@ -500,6 +654,216 @@ export default function TalkToAIScreen() {
   const formatFriendlyMinutes = (secs: number) => {
     const m = Math.round(secs / 60);
     return `${m} Min`;
+  };
+
+  const handleListenTargetVoice = async (targetId: string, englishText: string) => {
+    if (playingTargetId === targetId) {
+      // Toggle off / stop playback immediately
+      await SpeechService.stop();
+      setPlayingTargetId(null);
+      return;
+    }
+
+    setPlayingTargetId(targetId);
+    await SpeechService.speak(englishText, {
+      voiceName: 'en-US-AriaNeural',
+      onDone: () => {
+        setPlayingTargetId((prev) => (prev === targetId ? null : prev));
+      },
+      onError: () => {
+        setPlayingTargetId((prev) => (prev === targetId ? null : prev));
+      },
+    });
+  };
+
+  const handleStartPronunciationRecording = async (targetId: string) => {
+    if (!NetworkService.getIsOnline()) {
+      setNoticeModal({
+        visible: true,
+        type: 'network_error',
+        title: 'Internet Required / इंटरनेट आवश्यक',
+        badge: 'OFFLINE',
+        message: 'Speech evaluation requires an active internet connection.',
+        hindiDetail: 'बोलकर अभ्यास करने और AI मूल्यांकन के लिए इंटरनेट कनेक्शन चालू करें।',
+        primaryActionText: 'Got It / समझ गया',
+        onPrimaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+      });
+      return;
+    }
+
+    try {
+      setActivePracticingTargetId(targetId);
+      setIsPronunciationPreparing(true);
+
+      const perms = await AudioModule.requestRecordingPermissionsAsync();
+      if (!perms.granted) {
+        setIsPronunciationPreparing(false);
+        setActivePracticingTargetId(null);
+        setNoticeModal({
+          visible: true,
+          type: 'permission_denied',
+          title: 'Mic Permission / माइक अनुमति',
+          badge: 'PERMISSION',
+          message: 'Please allow microphone access in device settings to practice speaking.',
+          hindiDetail: 'English Formula 600 को सेटिंग्स में जाकर माइक्रोफ़ोन की अनुमति दें।',
+          primaryActionText: 'OK / ठीक है',
+          onPrimaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+        });
+        return;
+      }
+
+      await SpeechService.stop();
+      setPlayingTargetId(null);
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+      });
+
+      const recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      pronunciationRecorderRef.current = recorder;
+      pronunciationStartTimeRef.current = Date.now();
+
+      // Buffer to guarantee the native audio record track is actively capturing
+      await new Promise((r) => setTimeout(r, 250));
+
+      try {
+        Vibration.vibrate(50);
+      } catch {}
+
+      setIsPronunciationPreparing(false);
+      setIsPronunciationRecording(true);
+    } catch (e: any) {
+      console.warn('Pronunciation record error:', e);
+      setIsPronunciationPreparing(false);
+      setIsPronunciationRecording(false);
+      setActivePracticingTargetId(null);
+      setNoticeModal({
+        visible: true,
+        type: 'could_not_hear',
+        title: 'Microphone Notice / माइक सूचना',
+        badge: 'MIC ERROR',
+        message: 'Could not access device microphone: ' + (e?.message || 'Hardware busy'),
+        hindiDetail: 'माइक उपलब्ध नहीं है। कृपया ऐप दोबारा शुरू करें।',
+        primaryActionText: 'OK / ठीक है',
+        onPrimaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+      });
+    }
+  };
+
+  const handleStopAndEvaluatePronunciation = async (target: PronunciationTarget) => {
+    setIsPronunciationRecording(false);
+    setIsPronunciationPreparing(false);
+    setIsPronunciationEvaluating(true);
+    const rec = pronunciationRecorderRef.current;
+    pronunciationRecorderRef.current = null;
+    if (!rec) {
+      setIsPronunciationEvaluating(false);
+      setActivePracticingTargetId(null);
+      return;
+    }
+
+    try {
+      const elapsed = Date.now() - (pronunciationStartTimeRef.current || 0);
+      // Ensure at least 1.1s total has passed so Android MediaRecorder doesn't throw 'stop failed'
+      if (elapsed < 1100) {
+        await new Promise((r) => setTimeout(r, Math.max(350, 1100 - elapsed)));
+      } else {
+        // Trailing buffer to guarantee the final syllable is not chopped off:
+        await new Promise((r) => setTimeout(r, 350));
+      }
+
+      await rec.stop();
+      // Allow Android native file buffers to fully flush to disk
+      await new Promise((r) => setTimeout(r, 250));
+      const uri = rec.uri;
+      if (!uri) {
+        setIsPronunciationEvaluating(false);
+        setActivePracticingTargetId(null);
+        return;
+      }
+
+      const base64Audio = await readUriAsBase64(uri).catch(() => '');
+      // Transcribe via high-speed direct Groq cloud with vocabulary guidance
+      const transcribedText = await transcribeSpeech(base64Audio, uri, target.english);
+
+      if (!transcribedText) {
+        setIsPronunciationEvaluating(false);
+        setActivePracticingTargetId(null);
+        const isOnline = NetworkService.getIsOnline();
+        if (!isOnline) {
+          setNoticeModal({
+            visible: true,
+            type: 'network_error',
+            title: 'Offline / इंटरनेट कनेक्शन नहीं है',
+            badge: 'OFFLINE',
+            message: 'AI Speech Recognition requires an active internet connection.',
+            hindiDetail: 'कृपया अपना Wi-Fi या मोबाइल डेटा चालू करें और दोबारा बोलें।',
+            primaryActionText: 'Try Again / दोबारा कोशिश करें',
+            onPrimaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+            secondaryActionText: 'Close / बंद करें',
+            onSecondaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+          });
+        } else {
+          setNoticeModal({
+            visible: true,
+            type: 'could_not_hear',
+            title: 'Could Not Hear / आवाज़ सुनाई नहीं दी',
+            badge: 'MICROPHONE',
+            message: 'No clear speech was detected in the recording.',
+            hindiDetail: 'फ़ोन के माइक के पास आकर साफ़ आवाज़ में बोलें। "Mic is LIVE" दिखने के बाद बोलना शुरू करें।',
+            primaryActionText: 'Speak Again / दोबारा बोलें 🎙️',
+            onPrimaryAction: () => {
+              setNoticeModal((prev) => ({ ...prev, visible: false }));
+              setTimeout(() => {
+                handleStartPronunciationRecording(target.id);
+              }, 300);
+            },
+            secondaryActionText: 'Cancel / बंद करें',
+            onSecondaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+          });
+        }
+        return;
+      }
+
+      const evalResult = SpeechService.evaluatePronunciation(target.english, transcribedText);
+      setPronunciationEvaluation((prev) => ({
+        ...prev,
+        [target.id]: evalResult,
+      }));
+
+      // Award XP for spoken pronunciation drill
+      GamificationRepository.awardXp({
+        activityType: 'speaking_session',
+        title: `Pronunciation: "${target.english.slice(0, 20)}..."`,
+        eventKey: `pronounce_${target.id}_${Date.now()}`,
+      });
+    } catch (err: any) {
+      console.warn('Pronunciation eval error:', err);
+      setIsPronunciationEvaluating(false);
+      setActivePracticingTargetId(null);
+      setNoticeModal({
+        visible: true,
+        type: 'could_not_hear',
+        title: 'Evaluation Notice / मूल्यांकन सूचना',
+        badge: 'RETRY',
+        message: 'Could not process audio. Please try speaking again.',
+        hindiDetail: 'ऑडियो प्रोसेस नहीं हो पाया। कृपया माइक के पास साफ़ आवाज़ में दोबारा बोलें।',
+        primaryActionText: 'Speak Again / दोबारा बोलें 🎙️',
+        onPrimaryAction: () => {
+          setNoticeModal((prev) => ({ ...prev, visible: false }));
+          setTimeout(() => {
+            handleStartPronunciationRecording(target.id);
+          }, 300);
+        },
+        secondaryActionText: 'Close / बंद करें',
+        onSecondaryAction: () => setNoticeModal((prev) => ({ ...prev, visible: false })),
+      });
+    } finally {
+      setIsPronunciationEvaluating(false);
+      setActivePracticingTargetId(null);
+    }
   };
 
   const isInSession =
@@ -581,6 +945,7 @@ export default function TalkToAIScreen() {
                 },
               });
             } else {
+              SpeechService.stop();
               router.back();
             }
           }}
@@ -620,7 +985,7 @@ export default function TalkToAIScreen() {
                       ? 'Connecting...'
                       : isInSession
                         ? 'Connected'
-                        : 'Offline'}
+                        : 'Ready'}
             </Text>
           </View>
         </View>
@@ -638,6 +1003,9 @@ export default function TalkToAIScreen() {
         </View>
       </View>
 
+      {/* Offline Status Banner */}
+      <OfflineStatusBanner compact />
+
       {/* CONTEXT FORMULA BANNER (if launched from a specific formula) */}
       {contextFormula && (
         <View style={styles.contextFormulaBanner}>
@@ -650,10 +1018,308 @@ export default function TalkToAIScreen() {
         </View>
       )}
 
-      {/* MAIN VIEW: SETUP OR CONVERSATION */}
-      {!isInSession && turns.length === 0 ? (
-        // PRE-SESSION SETUP VIEW
-        <ScrollView style={styles.setupScroll} contentContainerStyle={styles.setupContent} showsVerticalScrollIndicator={false}>
+      {/* TOP SEGMENTED MODE SELECTOR */}
+      <View style={styles.topSegmentedBar}>
+        <TouchableOpacity
+          style={[styles.segmentBtn, activeTab === 'conversation' && styles.segmentBtnActive]}
+          onPress={() => {
+            SpeechService.stop();
+            setPlayingTargetId(null);
+            setActiveTab('conversation');
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="chatbubbles"
+            size={15}
+            color={activeTab === 'conversation' ? '#111114' : '#6B7280'}
+          />
+          <Text
+            style={[
+              styles.segmentBtnText,
+              activeTab === 'conversation' && styles.segmentBtnTextActive,
+            ]}
+          >
+            Live Conversation
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.segmentBtn, activeTab === 'pronunciation' && styles.segmentBtnActive]}
+          onPress={() => {
+            if (isInSession) {
+              handleEndSession();
+            }
+            SpeechService.stop();
+            setPlayingTargetId(null);
+            setActiveTab('pronunciation');
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="mic"
+            size={15}
+            color={activeTab === 'pronunciation' ? '#111114' : '#6B7280'}
+          />
+          <Text
+            style={[
+              styles.segmentBtnText,
+              activeTab === 'pronunciation' && styles.segmentBtnTextActive,
+            ]}
+          >
+            Pronunciation Practice
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* MAIN VIEW: PRONUNCIATION PRACTICE OR LIVE CONVERSATION */}
+      {activeTab === 'pronunciation' ? (
+        <ScrollView
+          style={styles.setupScroll}
+          contentContainerStyle={styles.setupContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Pronunciation Header Card */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroBadge}>
+              <Ionicons name="volume-high" size={13} color="#D6FF57" />
+              <Text style={styles.heroBadgeText}>NATIVE ACCENT & PRONUNCIATION</Text>
+            </View>
+            <Text style={styles.heroTitle}>Target Sentence Practice</Text>
+            <Text style={styles.heroSubtitle}>
+              Listen to native pronunciation, speak into the microphone, and receive honest accuracy feedback!
+            </Text>
+          </View>
+
+          {/* Level Switcher */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>SELECT PRACTICE LEVEL</Text>
+            <View style={styles.modeCardsRow}>
+              {(['beginner', 'intermediate', 'advanced'] as const).map((lvl) => (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[
+                    styles.modeCard,
+                    (selectedMode === lvl || (selectedMode === 'conversation' && lvl === 'advanced')) &&
+                      styles.modeCardActive,
+                  ]}
+                  onPress={() => setSelectedMode(lvl === 'advanced' ? 'conversation' : lvl)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.modeCardTitle,
+                      (selectedMode === lvl || (selectedMode === 'conversation' && lvl === 'advanced')) &&
+                        styles.modeCardTextActive,
+                    ]}
+                  >
+                    {lvl.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Target Sentences List */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionHeading}>TARGET SENTENCES TO PRACTICE</Text>
+            {PRONUNCIATION_TARGETS.filter((t) => {
+              const currentLvl = selectedMode === 'conversation' ? 'advanced' : selectedMode;
+              return t.level === currentLvl;
+            }).map((target) => {
+              const isTargetRecording =
+                isPronunciationRecording && activePracticingTargetId === target.id;
+              const isTargetPreparing =
+                isPronunciationPreparing && activePracticingTargetId === target.id;
+              const isTargetEvaluating =
+                isPronunciationEvaluating && activePracticingTargetId === target.id;
+              const evalRes = pronunciationEvaluation[target.id];
+
+              return (
+                <View key={target.id} style={styles.pronunciationCard}>
+                  {/* Topic badge */}
+                  <View style={styles.targetBadgeRow}>
+                    <Text style={{ fontSize: 14 }}>{target.topicEmoji}</Text>
+                    <Text style={styles.targetTopicText}>{target.topicTitle}</Text>
+                    {target.formulaId && (
+                      <View style={styles.targetFormulaBadge}>
+                        <Text style={styles.targetFormulaBadgeText}>Formula #{target.formulaId}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Target English Sentence */}
+                  <Text style={styles.targetEnglishSentence}>"{target.english}"</Text>
+                  <Text style={styles.targetHindiSentence}>{target.hindi}</Text>
+
+                  {/* Phonetic Tip */}
+                  <View style={styles.phoneticTipBox}>
+                    <Ionicons name="information-circle-outline" size={14} color="#38BDF8" />
+                    <Text style={styles.phoneticTipText}>{target.phoneticTip}</Text>
+                  </View>
+
+                  {/* Action buttons */}
+                  <View style={styles.targetActionsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.listenTargetBtn,
+                        playingTargetId === target.id && {
+                          backgroundColor: '#1E293B',
+                          borderColor: '#38BDF8',
+                          borderWidth: 1.5,
+                        },
+                      ]}
+                      onPress={() => handleListenTargetVoice(target.id, target.english)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons
+                        name={playingTargetId === target.id ? "stop-circle" : "volume-high"}
+                        size={16}
+                        color={playingTargetId === target.id ? "#38BDF8" : "#A3E635"}
+                      />
+                      <Text
+                        style={[
+                          styles.listenTargetBtnText,
+                          playingTargetId === target.id && { color: '#38BDF8', fontWeight: '800' },
+                        ]}
+                      >
+                        {playingTargetId === target.id ? "Stop ⏹️" : "Listen Native Voice 🔊"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {isTargetEvaluating ? (
+                      <View style={[styles.stopRecordTargetBtn, { backgroundColor: '#0284C7' }]}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text style={styles.stopRecordTargetBtnText}>Evaluating... ⏳</Text>
+                      </View>
+                    ) : isTargetPreparing ? (
+                      <View style={[styles.startRecordTargetBtn, { backgroundColor: '#EAB308' }]}>
+                        <ActivityIndicator size="small" color="#111114" />
+                        <Text style={[styles.startRecordTargetBtnText, { color: '#111114', marginLeft: 6 }]}>
+                          Starting Mic... ⏳
+                        </Text>
+                      </View>
+                    ) : isTargetRecording ? (
+                      <TouchableOpacity
+                        style={styles.stopRecordTargetBtn}
+                        onPress={() => handleStopAndEvaluatePronunciation(target)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="stop-circle" size={16} color="#FFFFFF" />
+                        <Text style={styles.stopRecordTargetBtnText}>Stop & Evaluate ⏹️ ({recordingDurationSecs}s)</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.startRecordTargetBtn}
+                        onPress={() => handleStartPronunciationRecording(target.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="mic" size={16} color="#111114" />
+                        <Text style={styles.startRecordTargetBtnText}>Speak & Compare 🎙️</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Preparing indicator */}
+                  {isTargetPreparing && (
+                    <View
+                      style={[
+                        styles.recordingActiveNotice,
+                        { borderColor: '#EAB308', backgroundColor: 'rgba(234, 179, 8, 0.15)' },
+                      ]}
+                    >
+                      <ActivityIndicator size="small" color="#EAB308" />
+                      <Text style={[styles.recordingActiveText, { color: '#EAB308', marginLeft: 8 }]}>
+                        Starting microphone... Please wait a moment.
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Recording indicator */}
+                  {isTargetRecording && (
+                    <View style={styles.recordingActiveNotice}>
+                      <View style={styles.pulsingRedDot} />
+                      <Text style={styles.recordingActiveText}>
+                        🔴 Mic is LIVE ({recordingDurationSecs}s) • Speak clearly / अब पूरा वाक्य बोलें...
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Evaluating indicator */}
+                  {isTargetEvaluating && (
+                    <View
+                      style={[
+                        styles.recordingActiveNotice,
+                        { borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.15)' },
+                      ]}
+                    >
+                      <ActivityIndicator size="small" color="#38BDF8" />
+                      <Text style={[styles.recordingActiveText, { color: '#38BDF8', marginLeft: 8 }]}>
+                        Evaluating pronunciation with AI...
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Evaluation Result */}
+                  {evalRes && (
+                    <View style={styles.evalResultBox}>
+                      <View style={styles.evalScoreRow}>
+                        <View
+                          style={[
+                            styles.evalScoreBadge,
+                            {
+                              backgroundColor:
+                                evalRes.accuracyScore >= 80
+                                  ? '#15803D'
+                                  : evalRes.accuracyScore >= 50
+                                    ? '#B45309'
+                                    : '#DC2626',
+                            },
+                          ]}
+                        >
+                          <Text style={styles.evalScoreBadgeText}>{evalRes.accuracyScore}% Match</Text>
+                        </View>
+                        <Text style={styles.evalFeedbackSummary}>
+                          {evalRes.accuracyScore === 100
+                            ? '🌟 Perfect pronunciation!'
+                            : evalRes.accuracyScore >= 80
+                              ? '👍 Great attempt!'
+                              : '💡 Keep practicing!'}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.spokenTextLabel}>What was heard:</Text>
+                      <Text style={styles.spokenTextValue}>"{evalRes.spokenSentence}"</Text>
+
+                      {/* Word analysis */}
+                      <View style={styles.wordPillsContainer}>
+                        {evalRes.matchedWords.map((w, idx) => (
+                          <View key={`m-${idx}`} style={styles.wordPillMatched}>
+                            <Ionicons name="checkmark" size={11} color="#15803D" />
+                            <Text style={styles.wordPillMatchedText}>{w}</Text>
+                          </View>
+                        ))}
+                        {evalRes.missedWords.map((w, idx) => (
+                          <View key={`x-${idx}`} style={styles.wordPillMissed}>
+                            <Ionicons name="close" size={11} color="#DC2626" />
+                            <Text style={styles.wordPillMissedText}>{w}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      <Text style={styles.evalFeedbackHindi}>💬 {evalRes.feedbackHindi}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      ) : (
+        /* CONVERSATION VIEW */
+        !isInSession && turns.length === 0 ? (
+          // PRE-SESSION SETUP VIEW
+          <ScrollView style={styles.setupScroll} contentContainerStyle={styles.setupContent} showsVerticalScrollIndicator={false}>
           {/* Elevated Hero Welcome Card */}
           <View style={styles.heroCard}>
             <View style={styles.heroBadge}>
@@ -747,6 +1413,65 @@ export default function TalkToAIScreen() {
                 </Text>
               </View>
             </View>
+          </View>
+
+          {/* AI Voice Selector */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeading}>SELECT AI TEACHER VOICE (आवाज़ चुनें)</Text>
+              <TouchableOpacity
+                onPress={() => setIsVoiceModalVisible(true)}
+                style={styles.changeVoiceHeaderBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.changeVoiceHeaderText}>Change Voice ▾</Text>
+              </TouchableOpacity>
+            </View>
+
+            {(() => {
+              const currentVoice = VOICE_OPTIONS.find((v) => v.id === selectedVoice) || VOICE_OPTIONS[0];
+              const isPlayingCurrent = previewingVoiceId === currentVoice.id;
+              return (
+                <TouchableOpacity
+                  style={styles.selectedVoiceCard}
+                  onPress={() => setIsVoiceModalVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.selectedVoiceLeft}>
+                    <View style={styles.voiceAvatarWrap}>
+                      <Text style={styles.voiceAvatarEmoji}>{currentVoice.avatar}</Text>
+                    </View>
+                    <View style={styles.voiceInfoWrap}>
+                      <View style={styles.voiceNameRow}>
+                        <Text style={styles.voiceNameText}>{currentVoice.name}</Text>
+                        <View style={styles.voiceBadgePill}>
+                          <Text style={styles.voiceBadgeText}>{currentVoice.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.voiceTagline}>{currentVoice.tagline}</Text>
+                      <Text style={styles.voiceHindiDesc}>{currentVoice.hindiDesc}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.previewPlayBtn, isPlayingCurrent && styles.previewPlayBtnActive]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handlePreviewVoice(currentVoice);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={isPlayingCurrent ? 'stop-circle' : 'volume-medium'}
+                      size={17}
+                      color={isPlayingCurrent ? '#EF4444' : '#6366F1'}
+                    />
+                    <Text style={[styles.previewBtnText, isPlayingCurrent && styles.previewBtnTextActive]}>
+                      {isPlayingCurrent ? 'Stop' : 'Listen 🔊'}
+                    </Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            })()}
           </View>
 
           {/* Mode Selector */}
@@ -859,6 +1584,19 @@ export default function TalkToAIScreen() {
                   {TOPICS.find((t) => t.id === selectedTopic)?.title || 'Conversation'}
                 </Text>
               </View>
+              <TouchableOpacity
+                style={styles.metaVoiceBadge}
+                onPress={() => setIsVoiceModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.metaVoiceEmoji}>
+                  {VOICE_OPTIONS.find((v) => v.id === selectedVoice)?.avatar || '🌸'}
+                </Text>
+                <Text style={styles.metaVoiceText}>
+                  {VOICE_OPTIONS.find((v) => v.id === selectedVoice)?.name || 'Neerja'}
+                </Text>
+                <Ionicons name="chevron-down" size={10} color="#6366F1" style={{ marginLeft: 2 }} />
+              </TouchableOpacity>
               <View style={styles.metaModeBadge}>
                 <Text style={styles.metaModeText}>{selectedMode.toUpperCase()}</Text>
               </View>
@@ -982,6 +1720,14 @@ export default function TalkToAIScreen() {
                                 {turn.correction.corrected}
                               </Text>
                             </View>
+                            <TouchableOpacity
+                              style={styles.listenCorrectionPill}
+                              onPress={() => SpeechService.speak(turn.correction?.corrected || '')}
+                              activeOpacity={0.75}
+                            >
+                              <Ionicons name="volume-medium" size={14} color="#A3E635" />
+                              <Text style={styles.listenCorrectionPillText}>Listen Pronunciation 🔊</Text>
+                            </TouchableOpacity>
                           </View>
 
                           {/* Hinglish Explanation */}
@@ -1054,10 +1800,11 @@ export default function TalkToAIScreen() {
             )}
           </ScrollView>
         </View>
-      )}
+      ))}
 
       {/* BOTTOM ANIMATED VOICE CONTROL SUITE */}
-      <View style={styles.bottomControlsArea}>
+      {activeTab === 'conversation' && (
+        <View style={styles.bottomControlsArea}>
         {/* Dynamic 5-Bar Dancing Equalizer Waveform */}
         <View style={styles.equalizerWrap}>
           <Animated.View style={[styles.eqBar, { height: barAnim1, backgroundColor: getEqualizerBarColor() }]} />
@@ -1197,7 +1944,7 @@ export default function TalkToAIScreen() {
         {/* Subtitle Hint Text */}
         <Text style={styles.micHintText}>
           {sessionState === 'listening'
-            ? 'Speak English naturally (or tap mic when done)'
+            ? 'Listening... Speak English (or tap orb to send ⚡)'
             : sessionState === 'ai_speaking'
               ? 'AI is speaking... Tap mic to interrupt'
               : sessionState === 'processing'
@@ -1207,6 +1954,7 @@ export default function TalkToAIScreen() {
                   : 'Tap living orb to start conversation'}
         </Text>
       </View>
+      )}
 
       {/* ULTRA-MODERN CUSTOM ALERT MODAL */}
       <Modal
@@ -1250,7 +1998,9 @@ export default function TalkToAIScreen() {
                   ? styles.glowBarRed
                   : noticeModal.type === 'network_error'
                     ? styles.glowBarAmber
-                    : styles.glowBarLime,
+                    : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                      ? styles.glowBarCyan
+                      : styles.glowBarLime,
               ]}
             />
 
@@ -1262,7 +2012,9 @@ export default function TalkToAIScreen() {
                   ? styles.modalIconCircleRed
                   : noticeModal.type === 'network_error'
                     ? styles.modalIconCircleAmber
-                    : styles.modalIconCircleLime,
+                    : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                      ? styles.modalIconCircleCyan
+                      : styles.modalIconCircleLime,
               ]}
             >
               <Ionicons
@@ -1271,7 +2023,11 @@ export default function TalkToAIScreen() {
                     ? 'log-out-outline'
                     : noticeModal.type === 'network_error'
                       ? 'cloud-offline-outline'
-                      : 'sparkles'
+                      : noticeModal.type === 'could_not_hear'
+                        ? 'mic-off'
+                        : noticeModal.type === 'permission_denied'
+                          ? 'shield-checkmark-outline'
+                          : 'sparkles'
                 }
                 size={34}
                 color={
@@ -1279,7 +2035,9 @@ export default function TalkToAIScreen() {
                     ? '#F43F5E'
                     : noticeModal.type === 'network_error'
                       ? '#F59E0B'
-                      : '#A3E635'
+                      : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                        ? '#38BDF8'
+                        : '#A3E635'
                 }
               />
             </View>
@@ -1292,7 +2050,9 @@ export default function TalkToAIScreen() {
                   ? styles.modalBadgePillRed
                   : noticeModal.type === 'network_error'
                     ? styles.modalBadgePillAmber
-                    : styles.modalBadgePillLime,
+                    : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                      ? styles.modalBadgePillCyan
+                      : styles.modalBadgePillLime,
               ]}
             >
               <Text
@@ -1302,7 +2062,9 @@ export default function TalkToAIScreen() {
                     ? { color: '#F43F5E' }
                     : noticeModal.type === 'network_error'
                       ? { color: '#F59E0B' }
-                      : { color: '#A3E635' },
+                      : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                        ? { color: '#38BDF8' }
+                        : { color: '#A3E635' },
                 ]}
               >
                 {noticeModal.badge || 'NOTICE'}
@@ -1359,7 +2121,9 @@ export default function TalkToAIScreen() {
                     styles.modalPrimaryBtn,
                     noticeModal.type === 'confirm_exit'
                       ? styles.modalPrimaryBtnRed
-                      : styles.modalPrimaryBtnLime,
+                      : noticeModal.type === 'could_not_hear' || noticeModal.type === 'permission_denied'
+                        ? styles.modalPrimaryBtnCyan
+                        : styles.modalPrimaryBtnLime,
                   ]}
                   onPress={noticeModal.onPrimaryAction}
                   activeOpacity={0.85}
@@ -1378,7 +2142,9 @@ export default function TalkToAIScreen() {
                     name={
                       noticeModal.type === 'confirm_exit'
                         ? 'close-circle'
-                        : 'arrow-forward-circle'
+                        : noticeModal.type === 'could_not_hear'
+                          ? 'mic'
+                          : 'arrow-forward-circle'
                     }
                     size={20}
                     color={noticeModal.type === 'confirm_exit' ? '#FFFFFF' : '#0F172A'}
@@ -1401,11 +2167,396 @@ export default function TalkToAIScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* ULTRA-MODERN VOICE SELECTION MODAL */}
+      <Modal
+        visible={isVoiceModalVisible}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => {
+          SpeechService.stop();
+          setPreviewingVoiceId(null);
+          setIsVoiceModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              SpeechService.stop();
+              setPreviewingVoiceId(null);
+              setIsVoiceModalVisible(false);
+            }}
+          />
+          <View style={styles.voiceModalCard}>
+            <View style={styles.voiceModalHeader}>
+              <View style={styles.voiceModalTitleWrap}>
+                <Text style={styles.voiceModalTitle}>Choose AI Teacher Voice 🎙️</Text>
+                <Text style={styles.voiceModalSubtitle}>
+                  अपनी पसंद की मधुर व आकर्षक युवा आवाज़ चुनें (Sweet & Modern AI Voices)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.voiceModalCloseBtn}
+                onPress={() => {
+                  SpeechService.stop();
+                  setPreviewingVoiceId(null);
+                  setIsVoiceModalVisible(false);
+                }}
+              >
+                <Ionicons name="close" size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.voiceOptionsScroll} showsVerticalScrollIndicator={false}>
+              {VOICE_OPTIONS.map((voice) => {
+                const isSelected = selectedVoice === voice.id;
+                const isPreviewing = previewingVoiceId === voice.id;
+
+                return (
+                  <TouchableOpacity
+                    key={voice.id}
+                    style={[styles.voiceOptionItem, isSelected && styles.voiceOptionItemActive]}
+                    onPress={() => handleSelectVoice(voice.id)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.voiceItemLeft}>
+                      <View style={[styles.voiceItemAvatarWrap, isSelected && styles.voiceItemAvatarWrapActive]}>
+                        <Text style={styles.voiceItemAvatarEmoji}>{voice.avatar}</Text>
+                      </View>
+                      <View style={styles.voiceItemDetails}>
+                        <View style={styles.voiceItemNameRow}>
+                          <Text style={[styles.voiceItemName, isSelected && styles.voiceItemNameActive]}>
+                            {voice.name}
+                          </Text>
+                          <View style={[styles.voiceItemBadge, isSelected && styles.voiceItemBadgeActive]}>
+                            <Text style={[styles.voiceItemBadgeText, isSelected && styles.voiceItemBadgeTextActive]}>
+                              {voice.badge}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.voiceItemTagline}>{voice.tagline}</Text>
+                        <Text style={styles.voiceItemHindiDesc}>{voice.hindiDesc}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.voiceItemActions}>
+                      <TouchableOpacity
+                        style={[styles.voiceItemListenBtn, isPreviewing && styles.voiceItemListenBtnActive]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handlePreviewVoice(voice);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isPreviewing ? 'stop-circle' : 'volume-medium'}
+                          size={16}
+                          color={isPreviewing ? '#EF4444' : '#6366F1'}
+                        />
+                        <Text style={[styles.voiceItemListenText, isPreviewing && { color: '#EF4444' }]}>
+                          {isPreviewing ? 'Stop' : 'Listen'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={[styles.voiceRadioCircle, isSelected && styles.voiceRadioCircleActive]}>
+                        {isSelected && <View style={styles.voiceRadioInnerDot} />}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.voiceModalDoneBtn}
+              onPress={() => {
+                SpeechService.stop();
+                setPreviewingVoiceId(null);
+                setIsVoiceModalVisible(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.voiceModalDoneText}>Select Voice & Continue ✓</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  topSegmentedBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: radii.pill,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.lime,
+  },
+  segmentBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  segmentBtnTextActive: {
+    color: '#111114',
+    fontWeight: '800',
+  },
+  listenCorrectionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(163, 230, 53, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(163, 230, 53, 0.3)',
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  listenCorrectionPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A3E635',
+  },
+  pronunciationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  targetBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  targetTopicText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#374151',
+  },
+  targetFormulaBadge: {
+    backgroundColor: '#EDE9FE',
+    borderRadius: radii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  targetFormulaBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6D28D9',
+  },
+  targetEnglishSentence: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    lineHeight: 24,
+    marginBottom: 4,
+  },
+  targetHindiSentence: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  phoneticTipBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  phoneticTipText: {
+    fontSize: 12,
+    color: '#0369A1',
+    fontWeight: '600',
+    flex: 1,
+  },
+  targetActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  listenTargetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#111827',
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+  },
+  listenTargetBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  startRecordTargetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.lime,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+  },
+  startRecordTargetBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#111114',
+  },
+  stopRecordTargetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+  },
+  stopRecordTargetBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  recordingActiveNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+  },
+  pulsingRedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#DC2626',
+  },
+  recordingActiveText: {
+    fontSize: 11,
+    color: '#991B1B',
+    fontWeight: '600',
+    flex: 1,
+  },
+  evalResultBox: {
+    marginTop: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  evalScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  evalScoreBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
+  evalScoreBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  evalFeedbackSummary: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  spokenTextLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+  spokenTextValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  wordPillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  wordPillMatched: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  wordPillMatchedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  wordPillMissed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  wordPillMissedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#991B1B',
+    textDecorationLine: 'line-through',
+  },
+  evalFeedbackHindi: {
+    fontSize: 12,
+    color: '#4B5563',
+    lineHeight: 18,
+    fontWeight: '500',
+  },
   container: {
     flex: 1,
     backgroundColor: '#E5E5EB',
@@ -2183,6 +3334,9 @@ const styles = StyleSheet.create({
   glowBarLime: {
     backgroundColor: '#A3E635',
   },
+  glowBarCyan: {
+    backgroundColor: '#38BDF8',
+  },
   glowBarRed: {
     backgroundColor: '#F43F5E',
   },
@@ -2202,6 +3356,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(163, 230, 53, 0.4)',
   },
+  modalIconCircleCyan: {
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderWidth: 2,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+  },
   modalIconCircleRed: {
     backgroundColor: 'rgba(244, 63, 94, 0.12)',
     borderWidth: 2,
@@ -2220,6 +3379,9 @@ const styles = StyleSheet.create({
   },
   modalBadgePillLime: {
     backgroundColor: 'rgba(163, 230, 53, 0.15)',
+  },
+  modalBadgePillCyan: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
   },
   modalBadgePillRed: {
     backgroundColor: 'rgba(244, 63, 94, 0.15)',
@@ -2328,6 +3490,13 @@ const styles = StyleSheet.create({
   modalPrimaryBtnLime: {
     backgroundColor: '#A3E635',
     shadowColor: '#A3E635',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
+  modalPrimaryBtnCyan: {
+    backgroundColor: '#38BDF8',
+    shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -2510,5 +3679,320 @@ const styles = StyleSheet.create({
   },
   timerTextLow: {
     color: '#DC2626',
+  },
+  metaVoiceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    marginRight: 6,
+  },
+  metaVoiceEmoji: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  metaVoiceText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  changeVoiceHeaderBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  changeVoiceHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6366F1',
+  },
+  selectedVoiceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#E0E7FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  selectedVoiceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  voiceAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  voiceAvatarEmoji: {
+    fontSize: 22,
+  },
+  voiceInfoWrap: {
+    flex: 1,
+  },
+  voiceNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  voiceNameText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  voiceBadgePill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  voiceBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.3,
+  },
+  voiceTagline: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4F46E5',
+    marginTop: 2,
+  },
+  voiceHindiDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  previewPlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  previewPlayBtnActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  previewBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6366F1',
+  },
+  previewBtnTextActive: {
+    color: '#EF4444',
+  },
+  voiceModalCard: {
+    backgroundColor: '#0F172A',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 32,
+    maxHeight: '82%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  voiceModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  voiceModalTitleWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  voiceModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  voiceModalSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 3,
+    lineHeight: 16,
+  },
+  voiceModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceOptionsScroll: {
+    marginBottom: 16,
+  },
+  voiceOptionItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  voiceOptionItemActive: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderColor: '#6366F1',
+  },
+  voiceItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  voiceItemAvatarWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  voiceItemAvatarWrapActive: {
+    backgroundColor: 'rgba(99, 102, 241, 0.3)',
+  },
+  voiceItemAvatarEmoji: {
+    fontSize: 20,
+  },
+  voiceItemDetails: {
+    flex: 1,
+  },
+  voiceItemNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  voiceItemName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  voiceItemNameActive: {
+    color: '#A5B4FC',
+  },
+  voiceItemBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  voiceItemBadgeActive: {
+    backgroundColor: 'rgba(99, 102, 241, 0.4)',
+  },
+  voiceItemBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#CBD5E1',
+    letterSpacing: 0.3,
+  },
+  voiceItemBadgeTextActive: {
+    color: '#E0E7FF',
+  },
+  voiceItemTagline: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#818CF8',
+    marginTop: 2,
+  },
+  voiceItemHindiDesc: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  voiceItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  voiceItemListenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  voiceItemListenBtnActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#EF4444',
+  },
+  voiceItemListenText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C7D2FE',
+  },
+  voiceRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceRadioCircleActive: {
+    borderColor: '#6366F1',
+  },
+  voiceRadioInnerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#6366F1',
+  },
+  voiceModalDoneBtn: {
+    backgroundColor: '#6366F1',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  voiceModalDoneText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

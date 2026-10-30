@@ -1,0 +1,32 @@
+{
+  "users": {
+    "user_tuj4124z_mvuwsl25": {
+      "userId": "user_tuj4124z_mvuwsl25",
+      "displayName": "Learner",
+      "avatar": "happy-outline",
+      "allTimeXp": 200,
+      "weeklyXp": 200,
+      "monthlyXp": 200,
+      "weekKey": "2026-W44",
+      "monthKey": "2026-10",
+      "level": 2,
+      "levelTitle": "Spoken Learner",
+      "streak": 1,
+      "lastActiveAt": "2026-10-30T12:25:29.753Z"
+    },
+    "user_iu1t513k_mvtaavhk": {
+      "userId": "user_iu1t513k_mvtaavhk",
+      "displayName": "Learner",
+      "avatar": "happy-outline",
+      "allTimeXp": 200,
+      "weeklyXp": 200,
+      "monthlyXp": 200,
+      "weekKey": "2026-W44",
+      "monthKey": "2026-10",
+      "level": 2,
+      "levelTitle": "Spoken Learner",
+      "streak": 1,
+      "lastActiveAt": "2026-10-30T17:39:40.901Z"
+    }
+  }
+}

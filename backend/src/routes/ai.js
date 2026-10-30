@@ -92,7 +92,7 @@ router.post('/live/token', async (req, res) => {
 
 // Real-time Whisper speech transcription for voice session turns
 router.post('/live/transcribe', async (req, res) => {
-  const { audioBase64 } = req.body || {};
+  const { audioBase64, format, prompt: clientPrompt } = req.body || {};
   if (!audioBase64 || typeof audioBase64 !== 'string') {
     return res.status(400).json({ error: 'audioBase64 string is required', text: '' });
   }
@@ -108,12 +108,26 @@ router.post('/live/transcribe', async (req, res) => {
       return res.json({ text: '' });
     }
 
-    const blob = new Blob([pcmBuf], { type: 'audio/wav' });
+    // Accurately detect audio container type (M4A / AAC vs RIFF WAV)
+    const isM4a =
+      format === 'm4a' ||
+      (pcmBuf.length >= 8 && pcmBuf.subarray(4, 8).toString('latin1') === 'ftyp');
+    const fileName = isM4a ? 'recording.m4a' : 'recording.wav';
+    const mimeType = isM4a ? 'audio/m4a' : 'audio/wav';
+
+    const blob = new Blob([pcmBuf], { type: mimeType });
     const formData = new FormData();
-    formData.append('file', blob, 'turn.wav');
+    formData.append('file', blob, fileName);
     formData.append('model', 'whisper-large-v3-turbo');
     formData.append('language', 'en');
-    formData.append('prompt', 'English conversation practice by Indian learner. Short sentences, daily life, kitchen, cooking, morning routine, greeting.');
+    formData.append('response_format', 'json');
+    formData.append('temperature', '0');
+    if (clientPrompt && typeof clientPrompt === 'string' && clientPrompt.trim() && !clientPrompt.includes('Indian learner')) {
+      const cleanPrompt = clientPrompt.trim().replace(/[❌✅💡📖🔄✨]/g, '');
+      if (cleanPrompt) {
+        formData.append('prompt', cleanPrompt);
+      }
+    }
 
     const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -136,12 +150,15 @@ router.post('/live/transcribe', async (req, res) => {
       text.toLowerCase() === 'you' ||
       text.toLowerCase() === 'bye.' ||
       text.toLowerCase() === 'thank you very much.' ||
+      text.toLowerCase() === 'indian learner.' ||
+      text.toLowerCase() === 'indian learner' ||
       text.toLowerCase() === 'subtitle by' ||
       text.toLowerCase().includes('subtitles')
     ) {
       text = '';
     }
 
+    console.log(`[Whisper Transcribe] Audio: ${pcmBuf.length}b, format: ${isM4a ? 'm4a' : 'wav'}. Heard: "${text}"`);
     res.json({ text });
   } catch (err) {
     console.error('[Live Transcribe Error]', err.message);
@@ -168,7 +185,7 @@ router.all('/live/reset', (req, res) => {
 
 // AI English Teacher
 router.post('/tutor', async (req, res) => {
-  const { question, formulaId, mode = 'beginner', clientId, history = [] } = req.body;
+  const { question, formulaId, mode = 'beginner', clientId, history = [], weakTopics = [] } = req.body;
   if (!question || typeof question !== 'string') {
     return res.status(400).json({ error: 'Question is required' });
   }
@@ -177,7 +194,7 @@ router.post('/tutor', async (req, res) => {
 
   try {
     const contextFormulas = FormulaRetrieval.retrieveContext({ formulaId, query: question });
-    const systemPrompt = buildTutorSystemPrompt(mode, contextFormulas);
+    const systemPrompt = buildTutorSystemPrompt(mode, contextFormulas, weakTopics);
     const maxHistory = parseInt(process.env.AI_MAX_HISTORY_MESSAGES || '4', 10);
     const recentHistory = (history || []).slice(-maxHistory);
 
@@ -239,7 +256,7 @@ router.post('/tutor', async (req, res) => {
 
 // AI Sentence Corrector
 router.post('/correct-sentence', async (req, res) => {
-  const { sentence, clientId } = req.body;
+  const { sentence, clientId, mode = 'beginner' } = req.body;
   if (!sentence || typeof sentence !== 'string') {
     return res.status(400).json({ error: 'Sentence is required' });
   }
@@ -248,7 +265,7 @@ router.post('/correct-sentence', async (req, res) => {
 
   try {
     const contextFormulas = FormulaRetrieval.retrieveContext({ query: sentence });
-    const systemPrompt = buildCorrectionSystemPrompt(contextFormulas);
+    const systemPrompt = buildCorrectionSystemPrompt(contextFormulas, mode);
 
     const routerResult = await aiProviderRouter.execute({
       type: 'correction',
@@ -363,12 +380,12 @@ Output MUST be a valid JSON array matching this format:
 
 // AI Quiz Generator
 router.post('/generate-quiz', async (req, res) => {
-  const { formulaId = 1, count = 5, clientId } = req.body;
+  const { formulaId = 1, count = 5, difficulty = 'beginner', clientId } = req.body;
   const formula = FormulaRetrieval.getFormulaById(formulaId) || FormulaRetrieval.getFormulaById(1);
   const userId = clientId || req.ip;
 
   try {
-    const systemPrompt = buildQuizSystemPrompt(formula, count);
+    const systemPrompt = buildQuizSystemPrompt(formula, count, difficulty);
 
     const routerResult = await aiProviderRouter.execute({
       type: 'quiz',
@@ -402,16 +419,24 @@ router.post('/conversation', async (req, res) => {
   const userId = clientId || req.ip;
 
   try {
-    const systemPrompt = `You are a conversational English conversation partner for a Hindi speaker.
+    const systemPrompt = `You are Neerja, a wonderfully warm, patient, empathetic bilingual AI English Speaking Teacher for Hindi speakers.
 Scenario: ${scenarioId || 'Everyday English Conversation'}
-Role: Speak naturally, ask ONE question at a time to keep the conversation going.
+Role: Speak naturally in a blend of clear spoken English and warm, simple conversational Hindi/Hinglish explanations.
 Correction Mode: "${correctionMode}".
-If the user made any grammar or vocabulary mistake:
-Provide the correction in simple Hindi under "correctionHindi", and the corrected English version under "correctedEnglish".
-Output JSON:
+
+CRITICAL PEDAGOGICAL GUIDELINES:
+1. IF THE LEARNER IS STUCK, SAYS "I DON'T KNOW", "MUJHE NAHI PATA", "KYA BOLU", "HINDI ME BOLO", OR SPEAKS IN HINDI:
+   - Step 1: Comfort them warmly in Hindi: "Koi baat nahi! Maine aapse pucha tha... [explain your question simply in Hindi]."
+   - Step 2: Teach them the exact English sentence to reply with: "Aap bol sakte hain: '[Sentence in English]' (iska matlab hai: [Hindi meaning])."
+   - Step 3: Encourage them to repeat it right now: "Ab aap mere sath boliye: '[Sentence in English]' - chaliye boliye!"
+2. IF THE LEARNER ANSWERS IN HINDI:
+   - Praise them and translate their thought: "Bahut badhiya! Isko English me bolenge: '[English sentence]'. Ab aap ek baar English me bolkar dekhiye!"
+3. IF THE LEARNER MAKES A GRAMMAR MISTAKE:
+   - Provide the correction in simple Hindi under "correctionHindi", and the corrected English version under "correctedEnglish".
+4. OUTPUT JSON:
 {
-  "reply": "Your conversational response in natural English (1-2 sentences) ending with a friendly question",
-  "correctionHindi": "If user made a mistake, explain it kindly in Hindi, else null",
+  "reply": "Your warm conversational response (2-3 spoken sentences) with simple Hindi explanations when teaching and clear English sentences to practice",
+  "correctionHindi": "If user made a mistake, explain why kindly in simple Hindi, else null",
   "correctedEnglish": "If user made a mistake, correct sentence, else null"
 }`;
 
@@ -451,6 +476,176 @@ Output JSON:
       error: err.message || 'Conversation practice failed. Please try again.',
       bothUnavailable: err.bothUnavailable || false
     });
+  }
+});
+
+// --- High-Fidelity Studio Neural Voice (EdgeTTS / Azure Neural) ---
+const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+const ttsCache = new Map();
+const MAX_TTS_CACHE = 400;
+
+// Reusable persistent client pool for instant sub-second response
+let pooledTtsClient = null;
+let pooledTtsVoice = null;
+
+// Map requested voices to youthful, melodious, modern neural voices (Never elderly Swara)
+function normalizeTtsVoice(voice) {
+  if (!voice || typeof voice !== 'string') return 'en-IN-NeerjaExpressiveNeural';
+  const v = voice.trim();
+  if (v === 'hi-IN-SwaraNeural' || v.toLowerCase().includes('swara')) {
+    return 'en-IN-NeerjaExpressiveNeural'; // Upgrade old auntie voice to sweet young Neerja Expressive
+  }
+  if (v.toLowerCase().includes('ava')) {
+    return 'en-US-AvaMultilingualNeural';
+  }
+  if (v.toLowerCase().includes('emma')) {
+    return 'en-US-EmmaMultilingualNeural';
+  }
+  if (v.toLowerCase().includes('neerja')) {
+    return 'en-IN-NeerjaExpressiveNeural';
+  }
+  if (v.toLowerCase().includes('jenny')) {
+    return 'en-US-JennyNeural';
+  }
+  return v;
+}
+
+// Pre-warm client pool in background
+(async function prewarmTts() {
+  try {
+    pooledTtsClient = new MsEdgeTTS();
+    await pooledTtsClient.setMetadata('en-IN-NeerjaExpressiveNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    pooledTtsVoice = 'en-IN-NeerjaExpressiveNeural';
+    console.log('⚡ [TTS Pool] Pre-warmed NeerjaExpressiveNeural persistent voice client.');
+  } catch (e) {
+    console.warn('[TTS Pool Prewarm Warn]', e.message);
+  }
+})();
+
+async function getOrSynthesizeAudio(text, voice = 'en-IN-NeerjaExpressiveNeural') {
+  const clean = text.trim();
+  const effectiveVoice = normalizeTtsVoice(voice);
+  const cacheKey = `${effectiveVoice}:::${clean}`;
+  if (ttsCache.has(cacheKey)) {
+    return ttsCache.get(cacheKey);
+  }
+
+  // Reuse pooled persistent client to eliminate re-connection latency
+  if (!pooledTtsClient || pooledTtsVoice !== effectiveVoice) {
+    pooledTtsClient = new MsEdgeTTS();
+    await pooledTtsClient.setMetadata(effectiveVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    pooledTtsVoice = effectiveVoice;
+  }
+
+  try {
+    const { audioStream } = pooledTtsClient.toStream(clean, { pitch: '+6Hz', rate: 1.05 });
+    const chunks = [];
+    for await (const chunk of audioStream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    if (ttsCache.size >= MAX_TTS_CACHE) {
+      const oldestKey = ttsCache.keys().next().value;
+      ttsCache.delete(oldestKey);
+    }
+    ttsCache.set(cacheKey, buffer);
+    return buffer;
+  } catch (err) {
+    // If socket connection dropped, renew client and retry once
+    pooledTtsClient = new MsEdgeTTS();
+    await pooledTtsClient.setMetadata(effectiveVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    pooledTtsVoice = effectiveVoice;
+
+    const { audioStream } = pooledTtsClient.toStream(clean, { pitch: '+6Hz', rate: 1.05 });
+    const chunks = [];
+    for await (const chunk of audioStream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    ttsCache.set(cacheKey, buffer);
+    return buffer;
+  }
+}
+
+// GET /api/ai/tts/stream - Ultra-low latency chunked streaming MP3
+router.get('/tts/stream', async (req, res) => {
+  const text = req.query.text;
+  const rawVoice = req.query.voice || 'en-IN-NeerjaExpressiveNeural';
+  const voice = normalizeTtsVoice(rawVoice);
+
+  if (!text || !text.trim()) {
+    return res.status(400).send('Text query parameter is required');
+  }
+
+  try {
+    if (!pooledTtsClient || pooledTtsVoice !== voice) {
+      pooledTtsClient = new MsEdgeTTS();
+      await pooledTtsClient.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+      pooledTtsVoice = voice;
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    const { audioStream } = pooledTtsClient.toStream(text.trim(), { pitch: '+6Hz', rate: 1.05 });
+    for await (const chunk of audioStream) {
+      res.write(chunk);
+    }
+    res.end();
+  } catch (err) {
+    console.error('[TTS Live Stream Error]:', err.message);
+    if (!res.headersSent) {
+      res.status(500).send(err.message);
+    }
+  }
+});
+
+// GET /api/ai/tts - Direct buffered MP3 for ExoPlayer / AudioPlayer
+router.get('/tts', async (req, res) => {
+  const text = req.query.text;
+  const rawVoice = req.query.voice || 'en-IN-NeerjaExpressiveNeural';
+  const voice = normalizeTtsVoice(rawVoice);
+
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'Text query parameter is required' });
+  }
+
+  try {
+    const buffer = await getOrSynthesizeAudio(text, voice);
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': buffer.length,
+      'Cache-Control': 'public, max-age=86400',
+      'Accept-Ranges': 'bytes'
+    });
+    return res.send(buffer);
+  } catch (err) {
+    console.error('[TTS Stream Error]:', err.message);
+    res.status(500).json({ error: 'TTS synthesis failed', details: err.message });
+  }
+});
+
+// POST /api/ai/tts - JSON base64 format
+router.post('/tts', async (req, res) => {
+  const { text, voice = 'en-IN-NeerjaExpressiveNeural' } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'Text body parameter is required' });
+  }
+
+  try {
+    const effectiveVoice = normalizeTtsVoice(voice);
+    const buffer = await getOrSynthesizeAudio(text, effectiveVoice);
+    res.json({
+      success: true,
+      audioBase64: buffer.toString('base64'),
+      mimeType: 'audio/mpeg',
+      length: buffer.length
+    });
+  } catch (err) {
+    console.error('[TTS JSON Error]:', err.message);
+    res.status(500).json({ error: 'TTS synthesis failed', details: err.message });
   }
 });
 

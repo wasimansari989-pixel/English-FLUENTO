@@ -225,6 +225,8 @@ const ResponseValidation = {
         corrected: parsed.corrected || originalInput,
         isCorrect: typeof parsed.isCorrect === 'boolean' ? parsed.isCorrect : false,
         explanationHindi: parsed.explanationHindi || 'वाक्य की व्याकरणिक संरचना और हेल्पिंग वर्ब पर ध्यान दें।',
+        hindiMeaning: parsed.hindiMeaning || null,
+        betterAlternative: parsed.betterAlternative || null,
         grammarTags: Array.isArray(parsed.grammarTags) ? parsed.grammarTags : ['english-grammar'],
         suggestedFormulaIds: Array.isArray(parsed.suggestedFormulaIds) ? parsed.suggestedFormulaIds.map(Number).filter(n => !isNaN(n)) : [],
         practiceExample: parsed.practiceExample || null
@@ -236,6 +238,8 @@ const ResponseValidation = {
       corrected: originalInput,
       isCorrect: true,
       explanationHindi: 'यह वाक्य व्याकरण के सामान्य नियमों के अनुसार ठीक प्रतीत होता है।',
+      hindiMeaning: null,
+      betterAlternative: null,
       grammarTags: ['general-english'],
       suggestedFormulaIds: [],
       practiceExample: null

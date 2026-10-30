@@ -21,6 +21,8 @@ import { FormulaLabGlassDeck } from '../src/components/FormulaLabGlassDeck';
 import { SentenceFormula } from '../src/types/formula';
 import { colors, radii, shadows, typography } from '../src/theme';
 import { BookmarkRepository } from '../src/database/bookmarkRepository';
+import { GamificationRepository } from '../src/database/gamificationRepository';
+import { OfflineStatusBanner } from '../src/components/OfflineStatusBanner';
 import { SessionManager } from '../src/database/sessionStore';
 import { StatusBar } from 'expo-status-bar';
 
@@ -54,13 +56,15 @@ export default function HomeScreen() {
         return;
       }
 
-      const [p, uProfile] = await Promise.all([
+      const [p, uProfile, gProfile] = await Promise.all([
         ProgressRepository.getProgress(),
         UserProfileRepository.getProfile(),
+        GamificationRepository.getProfile(),
       ]);
 
       setProgress(p);
       setProfile(uProfile);
+      setXpGems(gProfile.totalXp);
 
       const dayOfYear = Math.floor(
         (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
@@ -172,6 +176,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Offline Connection Status Banner */}
+        <OfflineStatusBanner />
+
         {/* ========================================================================= */}
         {/* PROTOTYPE SCREEN 13: GREETING & LEVEL BADGE                               */}
         {/* ========================================================================= */}
@@ -229,9 +236,24 @@ export default function HomeScreen() {
           <View style={styles.rowBetween}>
             <Text style={styles.toolkitHeading}>Your learning toolkit</Text>
             <View style={styles.chip}>
-              <Text style={styles.chipText}>3 paths</Text>
+              <Text style={styles.chipText}>4 paths</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => router.push('/ai-teacher')}
+            style={styles.toolkitItem}
+          >
+            <View style={[styles.toolkitIconBox, { backgroundColor: '#FFD166' }]}>
+              <Text style={{ fontSize: 16 }}>💬</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.toolkitTitle}>AI Personal Teacher</Text>
+              <Text style={styles.toolkitSub}>Chat lessons, grammar & sentence correction.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#777780" />
+          </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.75}

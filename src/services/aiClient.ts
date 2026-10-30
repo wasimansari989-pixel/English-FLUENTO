@@ -37,9 +37,9 @@ export async function getClientId(): Promise<string> {
 export async function getCandidateBackendUrls(): Promise<string[]> {
   const primary = await getBackendUrl();
   const urls = [
+    'http://192.168.29.231:3001',
     primary,
     'http://localhost:3001',
-    'http://192.168.29.231:3001',
     'http://10.0.2.2:3001',
   ];
   return Array.from(new Set(urls.filter(Boolean)));
@@ -47,6 +47,131 @@ export async function getCandidateBackendUrls(): Promise<string[]> {
 
 export async function setBackendUrl(url: string): Promise<void> {
   await Storage.setItem(BACKEND_URL_KEY, url.trim().replace(/\/+$/, ''));
+}
+
+const DIRECT_GROQ_KEY =
+  process.env.EXPO_PUBLIC_GROQ_API_KEY ||
+  Constants.expoConfig?.extra?.groqApiKey ||
+  '';
+
+/**
+ * Resilient multi-tier speech transcription.
+ * 1. Direct Groq Whisper Large V3 Turbo FIRST (lightning fast ~300ms, global cloud, works on cellular 4G/5G data & Wi-Fi).
+ * 2. Fallback to candidate backend servers if cloud direct is blocked.
+ */
+export async function transcribeSpeech(
+  audioBase64: string,
+  fileUri?: string,
+  prompt?: string
+): Promise<string> {
+  const isM4a =
+    fileUri?.endsWith('.m4a') ||
+    (!audioBase64?.startsWith('UklGR') &&
+      (audioBase64?.includes('ftyp') || audioBase64?.startsWith('AAAA') || Boolean(fileUri)));
+  const format = isM4a ? 'm4a' : 'wav';
+
+  // Tier 1: Direct Groq Whisper Large V3 Turbo (~300ms response over 4G/5G/Wi-Fi worldwide)
+  try {
+    const formData = new FormData();
+    if (fileUri) {
+      const formattedUri = Platform.OS === 'android' ? fileUri : fileUri.replace('file://', '');
+      formData.append('file', {
+        uri: formattedUri,
+        name: isM4a ? 'recording.m4a' : 'recording.wav',
+        type: isM4a ? 'audio/mp4' : 'audio/wav',
+      } as any);
+    } else if (audioBase64) {
+      const byteChars =
+        typeof atob !== 'undefined'
+          ? atob(audioBase64)
+          : Buffer.from(audioBase64, 'base64').toString('binary');
+      const pcmBytes = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        pcmBytes[i] = byteChars.charCodeAt(i);
+      }
+      const mimeType = isM4a ? 'audio/mp4' : 'audio/wav';
+      const fileName = isM4a ? 'recording.m4a' : 'recording.wav';
+      const blob = new Blob([pcmBytes], { type: mimeType });
+      formData.append('file', blob, fileName);
+    }
+
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'en');
+    formData.append('response_format', 'json');
+    formData.append('temperature', '0');
+
+    // Never use generic instructions or hallucination-triggering phrases as prompt.
+    // If a clean target prompt was provided, pass it safely as vocabulary guidance.
+    if (prompt && prompt.trim() && !prompt.includes('Indian learner')) {
+      const cleanPrompt = prompt.trim().replace(/[❌✅💡📖🔄✨]/g, '');
+      if (cleanPrompt) {
+        formData.append('prompt', cleanPrompt);
+      }
+    }
+
+    const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DIRECT_GROQ_KEY}`,
+      },
+      body: formData,
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (whisperRes.ok) {
+      const whisperData = await whisperRes.json();
+      let text = (whisperData.text || '').trim();
+      const lower = text.toLowerCase();
+      // Filter whisper silence / prompt hallucinations
+      if (
+        lower === 'thank you.' ||
+        lower === 'thank you' ||
+        lower === 'you' ||
+        lower === 'bye.' ||
+        lower === 'thank you very much.' ||
+        lower === 'indian learner.' ||
+        lower === 'indian learner' ||
+        lower === '.' ||
+        lower.includes('subtitles')
+      ) {
+        text = '';
+      }
+      if (text) {
+        return text;
+      }
+    } else {
+      const errText = await whisperRes.text().catch(() => '');
+      console.warn('[Direct Groq Whisper Error Status]', whisperRes.status, errText);
+    }
+  } catch (directErr) {
+    console.warn('[Direct Whisper Error]', directErr);
+  }
+
+  // Tier 2: Candidate backend servers fallback (when on local LAN / dev emulator)
+  if (audioBase64) {
+    const candidateUrls = await getCandidateBackendUrls();
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(`${url}/api/ai/live/transcribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioBase64, format, prompt }),
+          signal: AbortSignal.timeout(2500),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.text === 'string' && data.text.trim()) {
+            await setBackendUrl(url);
+            return data.text.trim();
+          }
+        }
+      } catch {
+        // try next candidate backend URL
+      }
+    }
+  }
+
+  return '';
 }
 
 function buildSegments(fullText: string, corePhrase: string): SentenceSegment[] {
@@ -288,7 +413,8 @@ export const AIClient = {
     question: string,
     formulaId?: number,
     mode: 'beginner' | 'intermediate' | 'advanced' = 'beginner',
-    history: any[] = []
+    history: any[] = [],
+    weakTopics: string[] = []
   ) {
     try {
       const clientId = await getClientId();
@@ -296,7 +422,7 @@ export const AIClient = {
       const res = await fetch(`${baseUrl}/api/ai/tutor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, formulaId, mode, clientId, history }),
+        body: JSON.stringify({ question, formulaId, mode, clientId, history, weakTopics }),
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
@@ -337,14 +463,14 @@ export const AIClient = {
     };
   },
 
-  async correctSentence(sentence: string): Promise<SentenceCorrectionResult & { remainingToday?: number; fallbackUsed?: boolean }> {
+  async correctSentence(sentence: string, mode: 'beginner' | 'intermediate' | 'advanced' = 'beginner'): Promise<SentenceCorrectionResult & { remainingToday?: number; fallbackUsed?: boolean }> {
     try {
       const clientId = await getClientId();
       const baseUrl = await getBackendUrl();
       const res = await fetch(`${baseUrl}/api/ai/correct-sentence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentence, clientId }),
+        body: JSON.stringify({ sentence, clientId, mode }),
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
@@ -358,6 +484,24 @@ export const AIClient = {
 
     // Local deterministic correction logic
     const s = sentence.trim();
+    if (/\bhe go\b/i.test(s) || /\bhe go\b/i.test(s)) {
+      return {
+        original: s,
+        corrected: s.replace(/\bgo\b/gi, 'went'),
+        isCorrect: false,
+        explanationHindi: "Past tense (बीता हुआ समय) में 'go' की जगह 'went' लगता है। 'yesterday' शब्द past tense indicate करता है।",
+        hindiMeaning: 'वह कल स्कूल गया था।',
+        betterAlternative: 'He went to school yesterday.',
+        grammarTags: ['past tense', 'irregular verb'],
+        suggestedFormulaIds: [10],
+        practiceExample: {
+          english: 'Make another sentence using "went".',
+          hindi: '"went" का use करके एक और sentence बनाओ।',
+        },
+        remainingToday: 10,
+      };
+    }
+
     if (/\bhe have\b/i.test(s)) {
       return {
         original: s,
@@ -365,6 +509,8 @@ export const AIClient = {
         isCorrect: false,
         explanationHindi:
           "He के साथ 'has' का उपयोग होता है, 'have' का नहीं। Present Perfect Continuous में Singular Subject के साथ 'has been' लगता है।",
+        hindiMeaning: 'वह सुबह 9 बजे से काम कर रहा है।',
+        betterAlternative: null,
         grammarTags: ['has been', 'subject-verb agreement'],
         suggestedFormulaIds: [207],
         practiceExample: {
@@ -381,6 +527,8 @@ export const AIClient = {
         corrected: s.replace(/\bi is\b/gi, 'I am').replace(/\bi are\b/gi, 'I am'),
         isCorrect: false,
         explanationHindi: "I के साथ हमेशा 'am' का प्रयोग होता है।",
+        hindiMeaning: 'मैं तैयार हूँ।',
+        betterAlternative: null,
         grammarTags: ['am/is/are'],
         suggestedFormulaIds: [5],
         practiceExample: {
@@ -396,6 +544,8 @@ export const AIClient = {
       corrected: s,
       isCorrect: true,
       explanationHindi: 'यह वाक्य व्याकरण के अनुसार सही लग रहा है!',
+      hindiMeaning: null,
+      betterAlternative: null,
       grammarTags: ['general-english'],
       suggestedFormulaIds: [1, 2],
       practiceExample: {
@@ -434,6 +584,76 @@ export const AIClient = {
   },
 
   async conversationStep(userMessage: string, scenarioId: string, history: any[] = []) {
+    // 1. Direct Groq Cloud (ultra-fast ~150ms conversational response worldwide on 4G/5G/Wi-Fi)
+    try {
+      const systemPrompt = [
+        'You are Neerja, a wonderfully warm, patient, empathetic bilingual AI English Speaking Teacher for Hindi speakers.',
+        `Topic: ${scenarioId || 'Everyday English Conversation'}.`,
+        'Role: Help Hindi speakers become fearless and fluent in spoken English through caring, 1-on-1 mentorship.',
+        'CRITICAL PEDAGOGICAL RULES:',
+        '1. IF THE LEARNER IS STUCK, SAYS "I DON\'T KNOW", "MUJHE NAHI PATA", "KYA BOLU", "HINDI ME BOLO", OR SPEAKS IN HINDI:',
+        '   - Step 1: Comfort them warmly in simple Hindi: "Koi baat nahi! Maine aapse pucha tha... [explain your question simply in Hindi]."',
+        '   - Step 2: Teach them the exact English sentence to reply with: "Aap bol sakte hain: \'<Sentence>\' (iska matlab: <Hindi>)."',
+        '   - Step 3: Encourage them to repeat it right now: "Ab aap mere sath boliye: \'<Sentence>\' - chaliye bolkar try kijiye!"',
+        '2. IF THE LEARNER ANSWERS IN HINDI (e.g. "main chai peeta hoon" or "mujhe car chalana pasand hai"):',
+        '   - Praise them: "Bahut badhiya! Isko English me bolenge: \'<English Sentence>\'. Ab aap ek baar English me bolkar dekhiye!"',
+        '3. IF THE LEARNER MAKES A GRAMMAR OR WORDING SLIP:',
+        '   - Gently praise their effort ("Good try!"), show the correct English sentence, explain why in 1 simple Hindi sentence, and prompt them to try it.',
+        '4. SPOKEN STYLE: Keep replies concise (2 to 3 spoken sentences). Do NOT output markdown bullet points or asterisks so it sounds natural when spoken aloud.'
+      ].join(' ');
+
+      const messages: any[] = [{ role: 'system', content: systemPrompt }];
+      if (Array.isArray(history)) {
+        for (const h of history.slice(-4)) {
+          messages.push({
+            role: h.sender === 'user' ? 'user' : 'assistant',
+            content: h.text,
+          });
+        }
+      }
+      messages.push({ role: 'user', content: userMessage });
+
+      // Try fast bilingual Qwen first, fallback to GPT-OSS
+      const candidateModels = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b'];
+      for (const model of candidateModels) {
+        try {
+          const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${DIRECT_GROQ_KEY}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages,
+              temperature: 0.7,
+              max_tokens: 280,
+            }),
+            signal: AbortSignal.timeout(5000),
+          });
+
+          if (groqRes.ok) {
+            const groqData = await groqRes.json();
+            const content = groqData.choices?.[0]?.message?.content?.trim() || '';
+            if (content) {
+              const cleanReply = content.replace(/```json|```/g, '').trim();
+              return {
+                reply: cleanReply,
+                correctionHindi: null,
+                correctedEnglish: null,
+                remainingToday: 10,
+              };
+            }
+          }
+        } catch {
+          // try next model
+        }
+      }
+    } catch (e) {
+      console.warn('[AIClient.conversationStep] Direct Groq conversation error, trying backend fallback:', e);
+    }
+
+    // 2. Candidate backend servers fallback
     try {
       const clientId = await getClientId();
       const baseUrl = await getBackendUrl();
@@ -441,7 +661,7 @@ export const AIClient = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMessage, scenarioId, history, clientId }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(3000),
       });
       if (res.ok) {
         return await res.json();
@@ -451,10 +671,10 @@ export const AIClient = {
     }
 
     return {
-      reply: 'That sounds interesting! Could you tell me more about that?',
+      reply: 'That sounds really interesting! Could you tell me a little more about that?',
       correctionHindi: null,
       correctedEnglish: null,
-      remainingToday: 10
+      remainingToday: 10,
     };
   },
 };

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getFormulaById } from '../../src/search/formulaSearch';
 import { BookmarkRepository } from '../../src/database/bookmarkRepository';
 import { ProgressRepository } from '../../src/database/progressRepository';
+import { GamificationRepository, getLocalDateString } from '../../src/database/gamificationRepository';
 import { ExamplePair } from '../../src/components/ExamplePair';
 import { HighlightLegend } from '../../src/components/HighlightedSentence';
 import { AIClient } from '../../src/services/aiClient';
@@ -39,6 +40,13 @@ export default function FormulaDetailScreen() {
       BookmarkRepository.isBookmarked(formulaId).then(setIsBookmarked);
       setTimeout(() => {
         ProgressRepository.recordFormulaViewed(formulaId);
+        GamificationRepository.awardXp({
+          activityType: 'formula_lesson',
+          title: `Studied Formula #${formulaId}`,
+          eventKey: `formula_${formulaId}_${getLocalDateString()}`,
+          formulaId,
+          category: f.category,
+        });
       }, 80);
     }
   }, [formulaId]);

@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { BookmarkRepository } from '../../src/database/bookmarkRepository';
 import { FormulaCard } from '../../src/components/FormulaCard';
 import { BottomNavBar } from '../../src/components/BottomNavBar';
+import { OfflineStatusBanner } from '../../src/components/OfflineStatusBanner';
 import categoriesData from '../../src/data/categories.json';
 import { colors, radii, shadows } from '../../src/theme';
 
@@ -122,6 +123,9 @@ export default function AllFormulasScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Offline Status Banner */}
+        <OfflineStatusBanner compact />
 
         {/* Search Bar & Jump to ID Row */}
         <View style={styles.searchRow}>

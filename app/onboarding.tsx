@@ -1945,7 +1945,7 @@ export default function OnboardingScreen() {
   // SCREEN 12: READY
   const renderReady = () => (
     <View>
-      <FluentOrb size={88} />
+      <FluentOrb size={88} state="listening" />
 
       <View style={{ alignItems: 'center', marginTop: 4 }}>
         <Text style={styles.eyebrow}>{t.ready.eyebrow}</Text>

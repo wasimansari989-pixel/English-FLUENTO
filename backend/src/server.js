@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const aiRouter = require('./routes/ai');
+const leaderboardRouter = require('./routes/leaderboard');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +23,7 @@ app.use((req, res, next) => {
 
 // API Routes
 app.use('/api/ai', aiRouter);
+app.use('/api/leaderboard', leaderboardRouter);
 
 app.get('/', (req, res) => {
   res.json({
